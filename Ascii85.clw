@@ -13,10 +13,15 @@ LeviEncoded STRING('<<~9jqo^BlbD-BleB1DJ+*+F(f,q/0JhKF<<GL>Cj@.4Gp$d7F!,L7@<<6@)
   'i(DIb:@FD,*)+C]U=@3BN#EcYf8ATD3s@q?d$AftVqCh[NqF<<G:8+EV:.+Cf>-FD5W8ARlolDIa' & |
   'l(DId<<j@<<?3r@:F%a+D58''ATD4$Bl@l3De:,-DJs`8ARoFb/0JMK@qB4^F!,R<<AKZ&-DfTqBG%G' & |
   '>uD.RTpAKYo''+CT/5+Cei#DII?(E,9)oF*2M7/c~>') 
+WhiteSpace  STRING('<<~9jqo^BlbD-BleB1DJ+*+F(f,q/0JhKF<<GL>Cj@.4Gp$d7F!,L7@<<6@)/0JDEF<<G%<<+EV:2F!,' & |
+  '<13,10,32>O<<DJ+*.@<<*K0@<<6L(Df-\0Ec5e;DffZ(EZee.Bl.9pF"AGXBPCsi+DGm>@3BB/F*&OCAfu2/AKY' & |
+  '<13,10,9>i(DIb:@FD,*)+C]U=@3BN#EcYf8ATD3s@q?d$AftVqCh[NqF<<G:8+EV:.+Cf>-FD5W8ARlolDIa' & |
+  '<13,10,11>l(DId<<j@<<?3r@:F%a+D58''ATD4$Bl@l3De:,-DJs`8ARoFb/0JMK@qB4^F!,R<<AKZ&-DfTqBG%G' & |
+  '<13,10,12>>uD.RTpAKYo''+CT/5+Cei#DII?(E,9)oF*2M7/c~>')
 Result BOOL
 Ln     LONG   
   CODE
-  DO ReadMeRtn
+  !DO ReadMeCodeRtn
   !--- Decode Test ---
   Result = Ascii85.DecodeString(LeviEncoded) 
   IF ~Result THEN 
@@ -33,6 +38,24 @@ Ln     LONG
          '||' & CHOOSE(Ascii85.DecodedStr=Leviathan,'Worked =.Leviathan Test','Failed =.Leviathan Test' ) ,|
          'Ascii85.DecodeString(LeviEncoded) ')
   END  
+
+  !--- Decode WhiteSpace Test ---
+  Result = Ascii85.DecodeString(WhiteSpace) 
+  IF ~Result THEN 
+      Message('.DecodeString(WhiteSpace)  Failed Error=' & Ascii85.ErrorMsg ) 
+  ELSIF Ascii85.DecodedStr &= NULL THEN 
+      Message('Bug .DecodeString(WhiteSpace) returned True but .DecodedStr is NULL')
+  ELSE 
+     SETCLIPBOARD(Ascii85.DecodedStr)
+     Message('DecodeString() Result=' & Result & ' Error=' & Ascii85.ErrorMsg & |
+         '||DecodeString ' & |
+         '|Size=' & Ascii85.DecodedSize & |
+         '|Len='  & Ascii85.DecodedLen & | 
+         '|Str='  & Ascii85.DecodedStr & |
+         '||' & CHOOSE(Ascii85.DecodedStr=Leviathan,'Worked =.Leviathan Test','Failed =.Leviathan Test' ) ,|
+         'Ascii85.DecodeString(WhiteSpace) ')
+  END  
+
   
   !--- Encode Test ---
   NoWrap85.LineLength=0   !No 13,10 to Match my LeviEncoded test
@@ -94,7 +117,7 @@ Ln     LONG
      Message('Ruby Decode Failed') 
   END 
 
-ReadMeRtn ROUTINE
+ReadMeCodeRtn ROUTINE
 
   IF ~Ascii85.DecodeString(LeviEncoded)  THEN 
       Message('.DecodeString(LeviEncoded)  Failed Error=' & Ascii85.ErrorMsg ) 
