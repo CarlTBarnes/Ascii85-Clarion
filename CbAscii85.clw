@@ -1,0 +1,281 @@
+                    MEMBER()
+!--------------------------
+! CbAscii85Class by Carl Barnes (c) April 2021 release under MIT License
+!--------------------------
+    INCLUDE('CbAscii85.INC'),ONCE
+    MAP
+    END
+
+_asciiOffset EQUATE(33)   !private const int _asciiOffset = 33;
+Pow85Grp     GROUP
+    LONG(85*85*85*85)
+    LONG(85*85*85)
+    LONG(85*85)
+    LONG(85)
+    LONG(1)
+             END
+pow85 LONG,DIM(5),OVER(Pow85Grp) !private uint[] pow85 = { 85*85*85*85, 85*85*85, 85*85, 85, 1 };
+
+!----------------------------------------
+CbAscii85Class.Construct        PROCEDURE()
+!----------------------------------------
+    CODE 
+    SELF.PrefixMark = '<<~' 
+    SELF.SuffixMark = '~>' 
+    SELF.LineLength = 75 
+    SELF.EnforceMarks = true
+    RETURN
+
+!---------------------------------------
+CbAscii85Class.Destruct PROCEDURE()
+!---------------------------------------
+    CODE
+    SELF.Kill()
+    RETURN
+        
+!-----------------------------------
+CbAscii85Class.Init PROCEDURE(<USHORT LineLength>,<BOOL EnforceMarks>,<STRING PrefixMark>,<STRING SuffixMark>)
+!-----------------------------------
+    CODE
+    IF ~OMITTED(LineLength)   THEN SELF.LineLength=LineLength.
+    IF ~OMITTED(EnforceMarks) THEN SELF.EnforceMarks=EnforceMarks.
+    IF ~OMITTED(PrefixMark)   THEN SELF.PrefixMark=PrefixMark.
+    IF ~OMITTED(SuffixMark)   THEN SELF.SuffixMark=SuffixMark.
+    RETURN
+
+!-----------------------------------
+CbAscii85Class.Kill     PROCEDURE(BOOL KillDecode=1, BOOL KillEncode=1)
+!-----------------------------------
+    CODE
+    IF KillDecode THEN
+       DISPOSE(SELF.DecodedStr)
+       SELF.DecodedSize = 0
+       SELF.DecodedLen = 0
+    END
+    IF KillEncode THEN
+       DISPOSE(SELF.EncodedStr)
+       SELF.EncodedSize = 0
+       SELF.EncodedLen = 0
+    END
+    RETURN
+
+!-----------------------------------
+CbAscii85Class.DecodeString  PROCEDURE(STRING s85)
+    CODE
+    RETURN SELF.DecodeString(s85) 
+!-----------------------------------
+CbAscii85Class.DecodeString  PROCEDURE(*STRING s85)
+!-----------------------------------
+Len_s85   LONG,AUTO
+S1   LONG,AUTO
+S2   LONG,AUTO
+SX   LONG,AUTO
+Len_Prfx  BYTE,AUTO
+Len_Sufx  BYTE,AUTO
+count       LONG 
+processChar BOOL,AUTO 
+cb BYTE,AUTO 
+    CODE   
+    CLEAR(SELF.ErrorMsg) ; SELF.Kill(1)
+    Len_s85=LEN(CLIP(s85)) ; S1=1 ; S2=Len_s85
+        !?? Strip White space off Front and Back ???
+    Len_Prfx=LEN(SELF.PrefixMark)
+    Len_Sufx=LEN(SELF.SuffixMark)
+    !-- strip prefix <~ and suffix ~> if present --
+    IF Len_Prfx AND Len_s85 >= Len_Prfx |
+    AND s85[1 : Len_Prfx]=SELF.PrefixMark THEN  !if (s.StartsWith(PrefixMark))
+       S1 += Len_Prfx                           ! s = s.Substring(PrefixMark.Length);
+    ELSIF SELF.EnforceMarks THEN 
+        DO MarksErrorRtn
+    END
+    IF Len_Sufx AND Len_s85 >= Len_Prfx+Len_Sufx |
+    AND s85[Len_s85 - Len_Sufx+1 : Len_s85]=SELF.SuffixMark THEN     
+        S2 -= Len_Sufx                          !s = s.Substring(0, s.Length - SuffixMark.Length);
+    ELSIF SELF.EnforceMarks THEN 
+        DO MarksErrorRtn
+    END
+    IF Len_s85 < 1 OR S1 > S2 THEN
+       SELF.ErrorMsg=S2-S1+1 & ' bytes to decode'
+       RETURN False
+    END 
+    
+    SELF.DecodedSize = Len_s85 / 5 * 4 + 5
+    SELF.DecodedStr &= NEW(STRING(SELF.DecodedSize))
+    SELF.DecodedLen = 0
+
+    SELF._tuple=0
+    CLEAR(SELF._decodedBlock[])
+    LOOP SX=S1 TO S2            !foreach (char c in s)
+        cb=val(S85[Sx])
+        CASE cb  !switch (c)
+        
+            OF VAL('z')
+                if count <> 0 then 
+                    SELF.ErrorMsg='The character "z" is invalid inside an ASCII85 block.'
+                    RETURN False
+                end 
+                CLEAR(SELF._decodedBlock[]) !Set to 0,0,0,0
+                SELF.DecodeBlock(4)
+                processChar = false
+
+            ! case '\n':  case '\r':  case '\t': case '\0':  case '\f':   case '\b':              
+            OF   10 OROF 13 OROF 9 OROF 0 OROF 12 OROF 8  
+            OROF 11 OROF 32     !Was missing /v 11 and Space. C Library isspace() ' '	 /n /t /v /f /r 
+                processChar = false
+
+            ELSE !default:
+                if cb < val('!') or cb > val('u') then  ! if (c < '!' || c > 'u')
+                    SELF.ErrorMsg='Bad character "'& cb & '" found. ASCII85 only allows characters ! to u.'
+                    RETURN False
+                    !throw new Exception("Bad character '" + c + "' found. ASCII85 only allows characters '!' to 'u'.");
+                end
+                processChar = true
+
+        END !CASE cb
+
+        if processChar then 
+           !_tuple += ((uint)(c - _asciiOffset) * pow85[count]);
+           !count++;                !Zero based pow85[] array so ++ after 
+            count += 1              !One  based in Clarion so ++ before
+            SELF._tuple += (cb - _asciiOffset) * pow85[count]
+
+            if count = 5 then           ! count=_encodedBlock.Length)                     
+                SELF.DecodeBlock(4)     !Appends .DecodedStr
+                SELF._tuple = 0
+                count = 0
+            end !If                            
+        end ! if (processChar)
+    END !LOOP SX=S1 TO S2 }
+
+    !-- if we have some bytes left over at the end --
+    if count <> 0 then
+        if count = 1 then 
+            SELF.ErrorMsg='The last block of ASCII85 data cannot be a single byte.'
+            RETURN False
+        end !if (count = 1)
+        count -= 1
+        SELF._tuple += pow85[count+1]
+        SELF.DecodeBlock(count)        !also does ms.WriteByte(_decodedBlock[i]);
+    end !if (count <> 0)    
+
+    RETURN True 
+
+MarksErrorRtn ROUTINE
+     SELF.ErrorMsg='ASCII85 encoded data should begin with "' & |
+                    SELF.PrefixMark & '" and end with "' & SELF.SuffixMark &'"'
+     RETURN False
+
+!==========================================
+CbAscii85Class.DecodeBlock PROCEDURE(BYTE bytes)
+i BYTE 
+    CODE 
+    LOOP i=1 TO bytes  !        for (int i = 0; i < bytes; i++)
+!         _decodedBlock[i] = (byte)(_tuple >> 24 - (i * 8));   ! >> Right Shift
+         SELF._decodedBlock[i] = BSHIFT(SELF._tuple, -24 + (i-1) * 8) 
+         SELF.DecodedLen += 1
+         SELF.DecodedStr[ SELF.DecodedLen ] = CHR(SELF._decodedBlock[i] )
+    END 
+    RETURN    
+
+!===========================================================================
+CbAscii85Class.EncodeString  PROCEDURE(STRING ba, LONG EncodeLength=0)!,BOOL
+    CODE 
+    RETURN SELF.EncodeString(ba,EncodeLength)
+!-----------------------------------
+CbAscii85Class.EncodeString  PROCEDURE(*STRING ba, LONG Len_Data=0)!,BOOL
+!-----------------------------------
+Len_Prfx  BYTE,AUTO
+Len_Sufx  BYTE,AUTO
+count LONG
+BX LONG,AUTO
+b  BYTE,AUTO 
+    CODE 
+    CLEAR(SELF.ErrorMsg) ; SELF.Kill(,1)
+    Len_Prfx=LEN(SELF.PrefixMark)
+    Len_Sufx=LEN(SELF.SuffixMark)
+    IF Len_Data=0 THEN Len_Data=LEN(CLIP(ba)).
+    IF Len_Data < 1 THEN 
+       SELF.ErrorMsg=Len_Data & ' bytes to encode'
+       RETURN False    
+    END
+    SELF.EncodedSize = Len_Data / 4 * 5 + 5 + Len_Prfx + Len_Sufx
+    IF SELF.LineLength THEN  
+       SELF.EncodedSize += 2 * ( 2 + SELF.EncodedSize / SELF.LineLength) 
+    END 
+    SELF.EncodedStr &= NEW(STRING(SELF.EncodedSize))
+    SELF.EncodedLen = 0
+    SELF._linePos = 0
+    SELF._tuple = 0
+
+    IF SELF.EnforceMarks AND Len_Prfx THEN
+       SELF.AppendString(SELF.PrefixMark) 
+    END
+
+    LOOP bx=1 TO Len_Data !foreach (byte b in ba)
+        b = VAL(ba[bx]) 
+        if count >= 4-1 then ! >= _decodedBlock.Length - 1) Every 4th byte zero based
+            SELF._tuple = BOR(SELF._tuple,b)     ! _tuple |= b;
+            if SELF._tuple = 0 then 
+               SELF.AppendChar('z')
+            else
+               SELF.EncodeBlock(5)
+            end 
+            SELF._tuple = 0
+            count = 0           
+        else 
+            !    _tuple   |= (uint) (b << (24 - (count * 8)));
+            SELF._tuple = BOR(SELF._tuple, BSHIFT(b , (24 - (count * 8))) ) 
+            count += 1
+        end 
+    END !Loop bx 
+
+    !-- if we have some bytes left over at the end --
+    if count > 0 then
+        SELF.EncodeBlock(count + 1)
+    end 
+
+    IF SELF.EnforceMarks AND Len_Sufx THEN
+       SELF.AppendString(SELF.SuffixMark) 
+    END        
+    RETURN true 
+  
+!-----------------------------------------    
+CbAscii85Class.EncodeBlock PROCEDURE(BYTE count)
+i LONG,AUTO  
+    CODE 
+    LOOP i = 5 TO 1 BY -1       ! for (int i = _encodedBlock.Length - 1; i >= 0; i--)
+        SELF._encodedBlock[i] = (SELF._tuple % 85) + _asciiOffset
+        SELF._tuple /= 85
+    END
+    LOOP i=1 TO count           ! for (int i = 0; i < count; i++)
+        SELF.AppendChar(CHR(SELF._encodedBlock[i]))
+    END 
+    RETURN 
+!-------------------------------------------------
+CbAscii85Class.AppendString PROCEDURE(string s) 
+    CODE
+    !This is just used for prefix / suffix marks
+    !Original code worked this way that AppendString checked length before
+    IF SELF.LineLength > 0 AND SELF._linePos + SIZE(s) > SELF.LineLength THEN 
+       SELF._linePos = SIZE(s)
+       SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<13>'
+       SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<10>'
+    ELSE
+        SELF._linePos += SIZE(s)
+    END
+    SELF.EncodedStr[SELF.EncodedLen+1 : SELF.EncodedLen+SIZE(s)]=s 
+    SELF.EncodedLen += SIZE(s)
+    RETURN 
+
+!-------------------------------------------------
+CbAscii85Class.AppendChar PROCEDURE(string Chr1) 
+    CODE 
+    SELF.EncodedLen += 1 
+    SELF.EncodedStr[SELF.EncodedLen] = Chr1  !sb.Append(c)
+    SELF._linePos += 1
+    IF SELF.LineLength > 0 AND (SELF._linePos >= SELF.LineLength) THEN 
+       SELF._linePos = 0
+       SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<13>'
+       SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<10>'
+    END 
+    RETURN         
