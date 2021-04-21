@@ -7,6 +7,7 @@ NoWrap85 CbAscii85Class
   MAP
   END
 
+LeviDOTs  STRING('Man.is.distinguished,.not.only.by.his.reason,.but.by.this.singular.passion.from.other.animals,.which.is.a.lust.of.the.mind,.that.by.a.perseverance.of.delight.in.the.continued.and.indefatigable.generation.of.knowledge,.exceeds.the.short.vehemence.of.any.carnal.pleasure.')
 Leviathan STRING('Man is distinguished, not only by his reason, but by this singular passion from other animals, which is a lust of the mind, that by a perseverance of delight in the continued and indefatigable generation of knowledge, exceeds the short vehemence of any carnal pleasure.')
 LeviEncoded STRING('<<~9jqo^BlbD-BleB1DJ+*+F(f,q/0JhKF<<GL>Cj@.4Gp$d7F!,L7@<<6@)/0JDEF<<G%<<+EV:2F!,' & |
   'O<<DJ+*.@<<*K0@<<6L(Df-\0Ec5e;DffZ(EZee.Bl.9pF"AGXBPCsi+DGm>@3BB/F*&OCAfu2/AKY' & |
@@ -23,6 +24,8 @@ A USHORT
 Result BOOL
 Ln     LONG   
   CODE
+  SYSTEM{PROP:MsgModeDefault}=MSGMODE:CANCOPY
+  !GOTO LengthTestsLabel:
   !GOTO All256Label:
   !DO ReadMeCodeRtn
   !--- Decode Test ---
@@ -79,19 +82,21 @@ Ln     LONG
          '||' & CHOOSE(NoWrap85.EncodedStr=LeviEncoded,'Worked =.LeviEncoded Test','Failed =.LeviEncoded Test' ) ,|
          'Ascii85.EncodeString(Leviathan) ')
   END  
-  
+
+LengthTestsLabel:  
   !--- Loop test various lengths ---
   LOOP Ln=1 TO SIZE(Leviathan) 
-       Result = NoWrap85.EncodeString(Leviathan[1 : Ln])
+       Result = Ascii85.EncodeString(Leviathan[1 : Ln])
        IF ~Result THEN 
-           Message('Encode Failed ' & NoWrap85.ErrorMsg & |
+           Message('Encode Failed ' & Ascii85.ErrorMsg & |
                    '||Ln='  & Ln &'|'& Leviathan[1 : Ln]  )
            Break
        END 
-       Result = Ascii85.DecodeString(NoWrap85.EncodedStr) !, NoWrap85.EncodedLen)
+
+       Result = Ascii85.DecodeString(Ascii85.EncodedStr) !, NoWrap85.EncodedLen)
        IF ~Result THEN 
            Message('DecodeString Failed ' & Ascii85.ErrorMsg & |
-                   '||Ln='  & Ln &'|'& Leviathan[1 : Ln]  )
+                   '||Ln='  & Ln &'|'& Leviathan[1 : Ln] &'||'& Ascii85.EncodedStr,'Length Tests' )
            Break
        ELSIF Ascii85.DecodedStr &= NULL THEN
            Message('DecodeString return True but is NULL '  & |
@@ -147,7 +152,21 @@ All256Label:     !--- All 256 Characters --
      Message('Ruby Decode FAILED') 
   END 
 
-
+  DO WrapCheckRtn
+  
+WrapCheckRtn ROUTINE 
+    !Verify line wrapping at 75. Can have a 74 line if "~>" would push it to 76
+    !I think I would rather have a 76 byte line than the ~> on its own
+    LOOP A=56 TO SIZE(LeviDOTs)
+        IF NOT ( INRANGE(A,56,59) OR INRANGE(A,56+59,120) ) THEN CYCLE. 
+        Result = Ascii85.EncodeString(LeviDOTs[1 : A],A)
+        SetClipboard('A=' & A & ' len=' & Ascii85.EncodedLen  & '<13,10><13,10>' & LeviDOTs[1 : A] &'<13,10><13,10>' & Ascii85.EncodedStr )
+        IF 2=Message(Clipboard() &'<13,10><13,10>' & ALL('1234567890',75) &'  75' , |
+                'Wrap Check ' & Ascii85.LineLength ,,|
+                'Continue|Stop',,MSGMODE:FIXEDFONT + MSGMODE:CANCOPY ) THEN BREAK.
+    END         
+    EXIT 
+    
 ReadMeCodeRtn ROUTINE
 
   IF ~Ascii85.DecodeString(LeviEncoded)  THEN 
