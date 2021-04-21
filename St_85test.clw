@@ -28,6 +28,7 @@ DBClear     PROCEDURE()                      !Clear DebugView Buffer
       END
     END
 
+LeviDOTs  STRING('Man.is.distinguished,.not.only.by.his.reason,.but.by.this.singular.passion.from.other.animals,.which.is.a.lust.of.the.mind,.that.by.a.perseverance.of.delight.in.the.continued.and.indefatigable.generation.of.knowledge,.exceeds.the.short.vehemence.of.any.carnal.pleasure.')
 Leviathan STRING('Man is distinguished, not only by his reason, but by this singular passion from other animals, which is a lust of the mind, that by a perseverance of delight in the continued and indefatigable generation of knowledge, exceeds the short vehemence of any carnal pleasure.')
 LeviEncoded STRING('<<~9jqo^BlbD-BleB1DJ+*+F(f,q/0JhKF<<GL>Cj@.4Gp$d7F!,L7@<<6@)/0JDEF<<G%<<+EV:2F!,' & |
   'O<<DJ+*.@<<*K0@<<6L(Df-\0Ec5e;DffZ(EZee.Bl.9pF"AGXBPCsi+DGm>@3BB/F*&OCAfu2/AKY' & |
@@ -60,6 +61,7 @@ Window WINDOW('ST Ascii85 Test of Geoffs Functions '),AT(,,400,200),CENTER,GRAY,
         TEXT,AT(1,150),FULL,USE(txt),HVSCROLL
     END
     CODE
+    SYSTEM{PROP:MsgModeDefault}=MSGMODE:CANCOPY
     OPEN(WINDOW)
     0{PROP:text}=clip(0{PROP:text}) &' - Library ' & system{PROP:LibVersion,2} &'.'& system{PROP:LibVersion,3}
     ACCEPT
@@ -149,27 +151,31 @@ Test5Rtn ROUTINE  !---- Split code you can modify ------------------------------
 Bang      BigBangTheory
 STencode  StringTheory
 STdecode  StringTheory 
-Ln     LONG 
+Ln     LONG
     CODE 
-!  LOOP Ln=SIZE(Leviathan) TO 1 BY -1 
   LOOP Ln=1 TO SIZE(Leviathan) BY 1
-       STencode.SetValue(Leviathan[1 : Ln]) 
-       Ascii85Encode(STencode)
-       IF INRANGE(Ln,57,59) THEN 
-          Bang.StringView('Length=' & Ln &'<13,10,13,10>Value=' & Leviathan[1 : Ln] & '<13,10,13,10>Encode=' & STencode.GetValue()) 
-          !Bang.ValueView(STencode,'Len Encode Test #' & Ln) 
+     !  STencode.SetValue(CLIP(Leviathan[1 : Ln]))   !Note CLIP() so no trailing spaces.
+       STencode.SetValue(CLIP(LeviDOTs[1 : Ln]))     !Has Dots for Spaces so no trailing
+       Ascii85Encode(STencode)   
+       !Check the line wrapping at 75. 
+       IF INRANGE(Ln,56,59) OR INRANGE(Ln,56+60,59+59) THEN 
+          Bang.StringView('Clip Length=' & LEN(CLIP(LeviDOTs[1 : Ln])) & '  Ln=' & Ln & |
+                    '  Encoded Length=' & STencode.Length() &'  Check Line Wrap 75?' &  |
+                    '<13,10,13,10>To Encode:<13,10>' & LeviDOTs[1 : Ln] & |
+                    '<13,10,13,10>Encoded:<13,10>' & STencode.GetValue(), |
+                    'Ascii85Encode Length Test Ln=' & Ln) 
        END 
 
        STdecode.SetValue(STencode) 
        Ascii85Decode(STdecode)    
        
-       IF STdecode.GetValue() <> Leviathan[1 : Ln] THEN  
-           setclipboard('"' & STdecode.GetValue() &'"<13,10>"' &Leviathan[1 : Ln] &'"' )
+       IF STdecode.GetValue() <> LeviDOTs[1 : Ln] THEN  
+           setclipboard('"' & STdecode.GetValue() &'"<13,10>"' &LeviDOTs[1 : Ln] &'"' )
            Message('Test Len='& Ln &' DecodeString Does NOT Match Encode') 
            Break
        END 
   END
-  Message('Length Tests ' & CHOOSE(Ln=1+SIZE(Leviathan),'PASSED',' Failed? ' & Ln ))    
+  Message('Length Tests ' & CHOOSE(Ln=1+SIZE(LeviDOTs),'PASSED',' Failed? ' & Ln ))    
    
 !========================================================================================
 DB   PROCEDURE(STRING xMessage)
