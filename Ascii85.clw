@@ -17,10 +17,13 @@ WhiteSpace  STRING('<<~9jqo^BlbD-BleB1DJ+*+F(f,q/0JhKF<<GL>Cj@.4Gp$d7F!,L7@<<6@)
   '<13,10,32>O<<DJ+*.@<<*K0@<<6L(Df-\0Ec5e;DffZ(EZee.Bl.9pF"AGXBPCsi+DGm>@3BB/F*&OCAfu2/AKY' & |
   '<13,10,9>i(DIb:@FD,*)+C]U=@3BN#EcYf8ATD3s@q?d$AftVqCh[NqF<<G:8+EV:.+Cf>-FD5W8ARlolDIa' & |
   '<13,10,11>l(DId<<j@<<?3r@:F%a+D58''ATD4$Bl@l3De:,-DJs`8ARoFb/0JMK@qB4^F!,R<<AKZ&-DfTqBG%G' & |
-  '<13,10,12>>uD.RTpAKYo''+CT/5+Cei#DII?(E,9)oF*2M7/c~>')
+  '<13,10,12>>uD.RTpAKYo''+CT/5+Cei#DII?(E,9)oF*2M7/c~>') 
+All256 STRING(256)
+A USHORT
 Result BOOL
 Ln     LONG   
   CODE
+  !GOTO All256Label:
   !DO ReadMeCodeRtn
   !--- Decode Test ---
   Result = Ascii85.DecodeString(LeviEncoded) 
@@ -102,20 +105,48 @@ Ln     LONG
        END 
 
   END
-  IF Ln = 1+ SIZE(Leviathan) THEN 
-     Message('Length tests all passed')
-  END 
-  
-  !Web Example
+  Message('Leviathan Length tests ' & CHOOSE(Ln = 1+ SIZE(Leviathan),'PASSED',' Failed ' & Ln))
+
+!===============================================================
+All256Label:     !--- All 256 Characters --   
+  NoWrap85.LineLength=0   !No 13,10 to Match my LeviEncoded test
+  LOOP A=1 TO 256 ; All256[A]=CHR(A-1) ; END 
+  LOOP A=256 TO 1 BY -1
+
+       Result = NoWrap85.EncodeString(All256,256)
+       IF ~Result THEN 
+           Message('A='& A &' Encode All 256 Failed ' & NoWrap85.ErrorMsg )
+           Break
+       END
+       Result = Ascii85.DecodeString(NoWrap85.EncodedStr)
+       IF ~Result THEN 
+           Message('A='& A &' DecodeString Failed ' & Ascii85.ErrorMsg )
+           Break
+       ELSIF Ascii85.DecodedStr &= NULL THEN
+           Message('A='& A &' DecodeString return True but is NULL')
+           Break
+       
+       ELSIF Ascii85.DecodedStr <> All256 THEN  
+           setclipboard('"' & Ascii85.DecodedStr &'"<13,10>"' & All256 &'"' )
+           Message('A='& A &' DecodeString Does NOT Match Encode' & |
+                  '||Decode Len=' & Ascii85.DecodedLen &' Size=' & Ascii85.DecodedSize )
+           Break
+       END 
+       All256 = All256[256] & All256  !Rotate so high bye chnages
+  END
+  Message('High ASCII all 256 test ' & CHOOSE(A=0,'PASSED',' Failed? ' & A ))
+ 
+  !--- Web Example Ruby
   IF ~NoWrap85.EncodeString('Ruby') |
   OR NoWrap85.EncodedStr <> '<<~;KZGo~>' THEN 
-     Message('Ruby Encode Failed') 
+     Message('Ruby Encode FAILED') 
   END 
 
   IF ~NoWrap85.DecodeString('<<~;KZGo~>') |
   OR NoWrap85.DecodedStr <> 'Ruby' THEN 
-     Message('Ruby Decode Failed') 
+     Message('Ruby Decode FAILED') 
   END 
+
 
 ReadMeCodeRtn ROUTINE
 

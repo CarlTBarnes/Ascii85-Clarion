@@ -8,13 +8,13 @@
 
 _asciiOffset EQUATE(33)   !private const int _asciiOffset = 33;
 Pow85Grp     GROUP
-    LONG(85*85*85*85)
-    LONG(85*85*85)
-    LONG(85*85)
-    LONG(85)
-    LONG(1)
+    ULONG(85*85*85*85)
+    ULONG(85*85*85)
+    ULONG(85*85)
+    ULONG(85)
+    ULONG(1)
              END
-pow85 LONG,DIM(5),OVER(Pow85Grp) !private uint[] pow85 = { 85*85*85*85, 85*85*85, 85*85, 85, 1 };
+pow85 ULONG,DIM(5),OVER(Pow85Grp) !private uint[] pow85 = { 85*85*85*85, 85*85*85, 85*85, 85, 1 };
 
 !----------------------------------------
 CbAscii85Class.Construct        PROCEDURE()
@@ -74,7 +74,8 @@ Len_Prfx  BYTE,AUTO
 Len_Sufx  BYTE,AUTO
 count       LONG 
 processChar BOOL,AUTO 
-cb BYTE,AUTO 
+cb BYTE,AUTO
+UL ULONG,AUTO 
     CODE   
     CLEAR(SELF.ErrorMsg) ; SELF.Kill(1)
     Len_s85=LEN(CLIP(s85)) ; S1=1 ; S2=Len_s85
@@ -137,7 +138,12 @@ cb BYTE,AUTO
            !_tuple += ((uint)(c - _asciiOffset) * pow85[count]);
            !count++;                !Zero based pow85[] array so ++ after 
             count += 1              !One  based in Clarion so ++ before
-            SELF._tuple += (cb - _asciiOffset) * pow85[count]
+
+           !Below right side is being calculated as LONG and going negative and WRONG on high ASCII
+           !alternate change, changed Pow85 from LONG to ULONG. Leaving UL here as obvious
+!            SELF._tuple += (cb - _asciiOffset) * pow85[count]   !<- Wrong High ASCII
+            UL = (cb - _asciiOffset) * pow85[count]   !Calc as ULONG 
+            SELF._tuple += UL                         !Sum as ULONG
 
             if count = 5 then           ! count=_encodedBlock.Length)                     
                 SELF.DecodeBlock(4)     !Appends .DecodedStr
