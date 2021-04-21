@@ -77,7 +77,8 @@ processChar BOOL,AUTO
 cb BYTE,AUTO
 UL ULONG,AUTO 
     CODE   
-    CLEAR(SELF.ErrorMsg) ; SELF.Kill(1)
+    CLEAR(SELF.ErrorMsg) 
+    SELF.Kill(1,0)
     Len_s85=LEN(CLIP(s85)) ; S1=1 ; S2=Len_s85
         !?? Strip White space off Front and Back ???
     Len_Prfx=LEN(SELF.PrefixMark)
@@ -196,7 +197,8 @@ count LONG
 BX LONG,AUTO
 b  BYTE,AUTO 
     CODE 
-    CLEAR(SELF.ErrorMsg) ; SELF.Kill(,1)
+    CLEAR(SELF.ErrorMsg) 
+    SELF.Kill(0,1)
     Len_Prfx=LEN(SELF.PrefixMark)
     Len_Sufx=LEN(SELF.SuffixMark)
     IF Len_Data=0 THEN Len_Data=LEN(CLIP(ba)).
@@ -260,15 +262,16 @@ i LONG,AUTO
 !-------------------------------------------------
 CbAscii85Class.AppendString PROCEDURE(string s) 
     CODE
-    !This is just used for prefix / suffix marks
+    !This is ONLY used for prefix / suffix marks
     !Original code worked this way that AppendString checked length before
-    IF SELF.LineLength > 0 AND SELF._linePos + SIZE(s) > SELF.LineLength THEN 
-       SELF._linePos = SIZE(s)
-       SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<13>'
-       SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<10>'
-    ELSE
+!04/21/21 Do Not line wrap and have ~> on a line by itself where it can be "lost" instead have line +2 too long
+!    IF SELF.LineLength > 0 AND SELF._linePos + SIZE(s) > SELF.LineLength THEN 
+!       SELF._linePos = SIZE(s)
+!       SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<13>'
+!       SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<10>'
+!    ELSE
         SELF._linePos += SIZE(s)
-    END
+!    END
     SELF.EncodedStr[SELF.EncodedLen+1 : SELF.EncodedLen+SIZE(s)]=s 
     SELF.EncodedLen += SIZE(s)
     RETURN 
@@ -276,12 +279,19 @@ CbAscii85Class.AppendString PROCEDURE(string s)
 !-------------------------------------------------
 CbAscii85Class.AppendChar PROCEDURE(string Chr1) 
     CODE 
-    SELF.EncodedLen += 1 
-    SELF.EncodedStr[SELF.EncodedLen] = Chr1  !sb.Append(c)
-    SELF._linePos += 1
-    IF SELF.LineLength > 0 AND (SELF._linePos >= SELF.LineLength) THEN 
+    IF SELF.LineLength > 0 AND (SELF._linePos + 1 > SELF.LineLength) THEN 
        SELF._linePos = 0
        SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<13>'
        SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<10>'
     END 
+
+    SELF.EncodedLen += 1 
+    SELF.EncodedStr[SELF.EncodedLen] = Chr1  !sb.Append(c)
+    SELF._linePos += 1
+!04/21/21 Moved up before append so do not leave uneeded 13,10
+!    IF SELF.LineLength > 0 AND (SELF._linePos >= SELF.LineLength) THEN 
+!       SELF._linePos = 0
+!       SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<13>'
+!       SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<10>'
+!    END 
     RETURN         
