@@ -22,7 +22,10 @@ WhiteSpace  STRING('<<~9jqo^BlbD-BleB1DJ+*+F(f,q/0JhKF<<GL>Cj@.4Gp$d7F!,L7@<<6@)
 All256 STRING(256)
 A USHORT
 Result BOOL
-Ln     LONG   
+Ln     LONG
+PassFail BYTE  !1=Pass 2=Fail
+IconPass EQUATE(Icon:Tick)   
+IconFail EQUATE(Icon:Cross)   
   CODE
   SYSTEM{PROP:MsgModeDefault}=MSGMODE:CANCOPY
   !GOTO Zero0000Label:
@@ -33,18 +36,19 @@ Ln     LONG
   Result = Ascii85.DecodeString(LeviEncoded & |
                                ' <13,10,9,11,12,32,0>')  !Trailing whitespace
   IF ~Result THEN 
-      Message('.DecodeString(LeviEncoded)  Failed Error=' & Ascii85.ErrorMsg ) 
+      Message('.DecodeString(LeviEncoded)  Failed Error=' & Ascii85.ErrorMsg,,IconFail) 
   ELSIF Ascii85.DecodedStr &= NULL THEN 
       Message('Bug .DecodeString(LeviEncoded) returned True but .DecodedStr is NULL')
   ELSE 
      SETCLIPBOARD(Ascii85.DecodedStr)
+     PassFail=CHOOSE(Ascii85.DecodedStr=Leviathan,1,2)
      Message('DecodeString() Result=' & Result & ' Error=' & Ascii85.ErrorMsg & |
          '||DecodeString ' & |
          '|Size=' & Ascii85.DecodedSize & |
          '|Len='  & Ascii85.DecodedLen & | 
          '|Str='  & Ascii85.DecodedStr & |
-         '||' & CHOOSE(Ascii85.DecodedStr=Leviathan,'Worked =.Leviathan Test','Failed =.Leviathan Test' ) ,|
-         'Ascii85.DecodeString(LeviEncoded) ')
+         '||' & CHOOSE(PassFail,'PASSED = Leviathan','FAILED <<> Leviathan' ) ,|
+         'Ascii85.DecodeString(LeviEncoded) ',CHOOSE(PassFail,IconPass,IconFail) )
   END  
 
   !--- Decode WhiteSpace Test ---
@@ -55,13 +59,14 @@ Ln     LONG
       Message('Bug .DecodeString(WhiteSpace) returned True but .DecodedStr is NULL')
   ELSE 
      SETCLIPBOARD(Ascii85.DecodedStr)
+     PassFail=CHOOSE(Ascii85.DecodedStr=Leviathan,1,2)
      Message('DecodeString() Result=' & Result & ' Error=' & Ascii85.ErrorMsg & |
          '||DecodeString ' & |
          '|Size=' & Ascii85.DecodedSize & |
          '|Len='  & Ascii85.DecodedLen & | 
          '|Str='  & Ascii85.DecodedStr & |
-         '||' & CHOOSE(Ascii85.DecodedStr=Leviathan,'Worked =.Leviathan Test','Failed =.Leviathan Test' ) ,|
-         'Ascii85.DecodeString(WhiteSpace) ')
+         '||' & CHOOSE(PassFail,'PASSED = Leviathan','FAILED <<> Leviathan' ) ,|
+         'Ascii85.DecodeString(WhiteSpace) ',CHOOSE(PassFail,IconPass,IconFail))
   END  
 
   
@@ -75,14 +80,15 @@ Ln     LONG
   ELSIF Ascii85.EncodedStr &= NULL THEN 
       Message('Bug .EncodeString(Leviathan) returned True but .EncodedStr is NULL')
   ELSE 
-     SETCLIPBOARD(Ascii85.EncodedStr)
+     SETCLIPBOARD(Ascii85.EncodedStr) 
+     PassFail=CHOOSE(NoWrap85.EncodedStr=LeviEncoded,1,2)
      Message('EncodeString() Result=' & Result & ' Error=' & Ascii85.ErrorMsg & |
          '||EncodeString' & |
          '|Size=' & Ascii85.EncodedSize & |
          '|Len='  & Ascii85.EncodedLen & | 
-         '|Str='  & Ascii85.EncodedStr & |
-         '||' & CHOOSE(NoWrap85.EncodedStr=LeviEncoded,'Worked =.LeviEncoded Test','Failed =.LeviEncoded Test' ) ,|
-         'Ascii85.EncodeString(Leviathan) ')
+         '|Str='  & Ascii85.EncodedStr & | 
+         '||' & CHOOSE(PassFail,'PASSED = Leviathan','FAILED = Leviathan' ) ,|
+         'Ascii85.EncodeString(Leviathan) ',CHOOSE(PassFail,IconPass,IconFail))
   END  
 
 LengthTestsLabel:  
@@ -107,12 +113,15 @@ LengthTestsLabel:
        
        ELSIF Ascii85.DecodedStr <> Leviathan[1 : Ln] THEN 
            Message('DecodeString Does NOT Match Encode' & |
-                   '||Ln='  & Ln &'|Encoded='& Leviathan[1 : Ln] &'|Decoded=' & Ascii85.DecodedStr  )
+                   '||Ln='  & Ln &'|Encoded='& Leviathan[1 : Ln] &'|Decoded=' & Ascii85.DecodedStr |
+                   ,,IconFail )
            Break
        END 
 
   END
-  Message('Leviathan Length tests ' & CHOOSE(Ln = 1+ SIZE(Leviathan),'PASSED',' Failed ' & Ln))
+  PassFail=CHOOSE(Ln = 1+ SIZE(Leviathan),1,2)
+  Message('Leviathan Length tests ' & CHOOSE(PassFail,'PASSED',' Failed ' & Ln) |
+          ,'Length Tests',CHOOSE(PassFail,IconPass,IconFail))
 
 !===============================================================
 All256Label:     !--- All 256 Characters --   
@@ -136,12 +145,14 @@ All256Label:     !--- All 256 Characters --
        ELSIF Ascii85.DecodedStr <> All256 THEN  
            setclipboard('"' & Ascii85.DecodedStr &'"<13,10>"' & All256 &'"' )
            Message('A='& A &' DecodeString Does NOT Match Encode' & |
-                  '||Decode Len=' & Ascii85.DecodedLen &' Size=' & Ascii85.DecodedSize )
+                  '||Decode Len=' & Ascii85.DecodedLen &' Size=' & Ascii85.DecodedSize ,,IconFail)
            Break
        END 
        All256 = All256[256] & All256  !Rotate so high bye chnages
   END
-  Message('High ASCII all 256 test ' & CHOOSE(A=0,'PASSED',' Failed? ' & A ))
+  PassFail=CHOOSE(A=0,1,2)
+  Message('High ASCII all 256 test ' & CHOOSE(PassFail,'PASSED',' Failed ' & A) |
+          ,'All 256',CHOOSE(PassFail,IconPass,IconFail))
 
 !===============================================================
 Zero0000Label:  !-- Test 4 Char Zeros compressed to 'z'   
@@ -161,7 +172,7 @@ Zero0000Label:  !-- Test 4 Char Zeros compressed to 'z'
        
        Result = Ascii85.EncodeString(All256,256)
        IF ~Result THEN 
-           Message('Zero Test #'& A &' Encode FAILED ' & Ascii85.ErrorMsg,,ICON:Cross )
+           Message('Zero Test #'& A &' Encode FAILED ' & Ascii85.ErrorMsg,,IconFail )
            Break
        ELSE 
          !Worked view encoed to see zzzzzzz 
@@ -178,7 +189,7 @@ Zero0000Label:  !-- Test 4 Char Zeros compressed to 'z'
            !setclipboard('"' & Ascii85.DecodedStr &'"<13,10>"' & All256 &'"' )
            Message('FAILED Zero Test #'& A &' DecodeString Does NOT Match Encode' & |
                   '||Decode Len=' & Ascii85.DecodedLen &' Size=' & Ascii85.DecodedSize ,|
-                  'Zero Test ' & A, ICON:Cross)
+                  'Zero Test ' & A, IconFail)
            Break
        END 
   END
