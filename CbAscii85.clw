@@ -8,14 +8,13 @@
 
 _asciiOffset EQUATE(33)   !private const int _asciiOffset = 33;
 Pow85Grp     GROUP
-    ULONG(85*85*85*85)
-    ULONG(85*85*85)
-    ULONG(85*85)
-    ULONG(85)
-    ULONG(1)
+    LONG(85*85*85*85)
+    LONG(85*85*85)
+    LONG(85*85)
+    LONG(85)
+    LONG(1)
              END
-pow85 ULONG,DIM(5),OVER(Pow85Grp) !private uint[] pow85 = { 85*85*85*85, 85*85*85, 85*85, 85, 1 };
-
+pow85 LONG,DIM(5),OVER(Pow85Grp) !private uint[] pow85 = { 85*85*85*85, 85*85*85, 85*85, 85, 1 };       
 !----------------------------------------
 CbAscii85Class.Construct        PROCEDURE()
 !----------------------------------------
@@ -111,7 +110,7 @@ Zeros LONG
     
     LOOP SX=S1 TO S2   !Single 'z' decodes as <0,0,0,0> so need to zllocate 4 bytes
         IF val(S85[Sx]) = 122 THEN Zeros += 1.  !122='z'
-    END
+    END ! ; IF Zeros THEN message('Zeros=' & Zeros).
     SELF.DecodedSize = (Len_s85 - Zeros) / 5 * 4 + Zeros * 4 + 5
     SELF.DecodedStr &= NEW(STRING(SELF.DecodedSize))
     SELF.DecodedLen = 0
@@ -190,7 +189,7 @@ MarksErrorRtn ROUTINE
 
 !==========================================
 CbAscii85Class.DecodeBlock PROCEDURE(BYTE bytes)
-i BYTE 
+i BYTE,AUTO 
     CODE 
     LOOP i=1 TO bytes  !        for (int i = 0; i < bytes; i++)
 !         _decodedBlock[i] = (byte)(_tuple >> 24 - (i * 8));   ! >> Right Shift
@@ -238,17 +237,18 @@ b  BYTE,AUTO
     LOOP bx=1 TO Len_Data !foreach (byte b in ba)
         b = VAL(ba[bx]) 
         if count >= 4-1 then ! >= _decodedBlock.Length - 1) Every 4th byte zero based
-            SELF._tuple = BOR(SELF._tuple,b)     ! _tuple |= b;
+            SELF._tupByte[1] = b  !SELF._tuple = BOR(SELF._tuple,b)     ! _tuple |= b;
             if SELF._tuple = 0 then 
-               SELF.AppendChar('z')
+               SELF.AppendChar(122) !('z')
             else
                SELF.EncodeBlock(5)
             end 
             SELF._tuple = 0
             count = 0           
         else 
-            !    _tuple   |= (uint) (b << (24 - (count * 8)));
-            SELF._tuple = BOR(SELF._tuple, BSHIFT(b , (24 - (count * 8))) ) 
+          !    _tuple   |= (uint) (b << (24 - (count * 8)));
+          ! SELF._tuple = BOR(SELF._tuple, BSHIFT(b , (24 - (count * 8))) ) 
+            SELF._tupByte[4-count] = b
             count += 1
         end 
     END !Loop bx 
@@ -260,7 +260,7 @@ b  BYTE,AUTO
 
     IF SELF.EnforceMarks AND Len_Sufx THEN
        SELF.AppendString(SELF.SuffixMark) 
-    END        
+    END 
     RETURN true 
   
 !-----------------------------------------    
@@ -272,7 +272,7 @@ i LONG,AUTO
         SELF._tuple /= 85
     END
     LOOP i=1 TO count           ! for (int i = 0; i < count; i++)
-        SELF.AppendChar(CHR(SELF._encodedBlock[i]))
+        SELF.AppendChar(SELF._encodedBlock[i])   
     END 
     RETURN 
 !-------------------------------------------------
@@ -293,16 +293,16 @@ CbAscii85Class.AppendString PROCEDURE(string s)
     RETURN 
 
 !-------------------------------------------------
-CbAscii85Class.AppendChar PROCEDURE(string Chr1) 
+CbAscii85Class.AppendChar PROCEDURE(BYTE Chr1) 
     CODE 
-    IF SELF.LineLength > 0 AND (SELF._linePos + 1 > SELF.LineLength) THEN 
+    IF SELF.LineLength > 0 AND SELF._linePos + 1 > SELF.LineLength THEN 
        SELF._linePos = 0
        SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<13>'
        SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<10>'
     END 
 
     SELF.EncodedLen += 1 
-    SELF.EncodedStr[SELF.EncodedLen] = Chr1  !sb.Append(c)
+    SELF.EncodedStr[SELF.EncodedLen] = CHR(Chr1)  !sb.Append(c)
     SELF._linePos += 1
 !04/21/21 Moved up before append so do not leave uneeded 13,10
 !    IF SELF.LineLength > 0 AND (SELF._linePos >= SELF.LineLength) THEN 
