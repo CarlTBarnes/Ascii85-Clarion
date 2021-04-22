@@ -44,7 +44,9 @@ WhiteSpace  STRING('<<~9jqo^BlbD-BleB1DJ+*+F(f,q/0JhKF<<GL>Cj@.4Gp$d7F!,L7@<<6@)
 G_Bang BigBangTheory        !Globals
 G_ST   StringTheory
 G_Lne  StringTheory    
-
+PassFail BYTE  !1=Pass 2=Fail
+IconPass EQUATE(Icon:Tick)   
+IconFail EQUATE(Icon:Cross)
     CODE
     TestCode()
     RETURN
@@ -58,6 +60,7 @@ Window WINDOW('ST Ascii85 Test of Geoffs Functions '),AT(,,400,200),CENTER,GRAY,
         BUTTON('3. WhiteSpace Decode'),AT(9,50),USE(?Test3)
         BUTTON('4. All 256 Characters'),AT(9,70),USE(?Test4)
         BUTTON('5. Various Length Tests'),AT(9,90),USE(?Test5)
+        BUTTON('6. Hex 0,0,0,0 Z Tests'),AT(9,110),USE(?Test6)
         TEXT,AT(1,150),FULL,USE(txt),HVSCROLL
     END
     CODE
@@ -75,6 +78,7 @@ Window WINDOW('ST Ascii85 Test of Geoffs Functions '),AT(,,400,200),CENTER,GRAY,
         OF ?Test3       ; DO Test3Rtn
         OF ?Test4       ; DO Test4Rtn
         OF ?Test5       ; DO Test5Rtn 
+        OF ?Test6       ; DO Test6Rtn 
         END
         CASE FIELD()
         END
@@ -176,7 +180,45 @@ Ln     LONG
        END 
   END
   Message('Length Tests ' & CHOOSE(Ln=1+SIZE(LeviDOTs),'PASSED',' Failed? ' & Ln ))    
-   
+
+Test6Rtn ROUTINE  !------------------------------------------------------ 
+    DATA
+Bang      BigBangTheory
+STencode  StringTheory
+STdecode  StringTheory 
+All256    STRING(256)
+A USHORT
+    CODE
+  !04/22/21 Added 'z' to 0,0,0,0 Zero test  .
+  !         No change to Ascii85Decode, let StringTheory append expand string
+  LOOP A=1 TO 20
+       EXECUTE A
+           All256=ALL(CHR(0),256)
+           All256=ALL('aaaa<0,0,0,0>',256)             !Test 2
+           All256=ALL('<0,0,0,0>aaaa',256)
+           All256=ALL('<0,0,0>aaaa',256)               !#4 has 3 x 00
+           All256=ALL('<0,0,0,0,0>aaaa',256)           !#5 has 5 x 00
+           All256=ALL('<81h,82,83h,84h,0,0,0,0>',256)
+           All256=ALL('<0,0,0,0,81h,82,83h,84h>',256) 
+           All256='<A1h,34h,CCh,15h,72h,DBh,9Dh,76h,28h>' & ALL(CHR(0),256) ! Test End
+       ELSE   
+           BREAK 
+       END
+
+       STencode.SetValue(All256) 
+       Ascii85Encode(STencode)
+       Bang.ValueView(STencode,'Zero Encode Test #' & A) 
+
+       STdecode.SetValue(STencode) 
+       Ascii85Decode(STdecode)    
+       
+       IF STdecode.GetValue() <> All256 THEN  
+           setclipboard('"' & STdecode.GetValue() &'"<13,10>"' & All256 &'"' )
+           Message('A='& A &' All 256 DecodeString Does NOT Match Encode') 
+           Break
+       END 
+  END
+    
 !========================================================================================
 DB   PROCEDURE(STRING xMessage)
 Prfx EQUATE('ScratchST: ')
@@ -264,9 +306,11 @@ padChars long
   x = 1
   loop 5 times
     loop x = x to pSt._DataEnd
-      case val(pSt.valueptr[x])
+      case val(pSt.valueptr[x]) 
       of 122; st.append('<0,0,0,0>')      !z used for zeroes (low-values)
       of 121; st.append('<32,32,32,32>')  !y used for spaces
+
+!Carl FYI: It would be faster to move the "of 33 to 117" to be first since it is the most common. 
       of 33 to 117
         y += 1
         if y < 5
