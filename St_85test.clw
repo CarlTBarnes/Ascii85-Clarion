@@ -61,6 +61,7 @@ Window WINDOW('ST Ascii85 Test of Geoffs Functions '),AT(,,400,200),CENTER,GRAY,
         BUTTON('4. All 256 Characters'),AT(9,70),USE(?Test4)
         BUTTON('5. Various Length Tests'),AT(9,90),USE(?Test5)
         BUTTON('6. Hex 0,0,0,0 Z Tests'),AT(9,110),USE(?Test6)
+        BUTTON('7. File ClaRun.DLL Encode Test'),AT(9,130),USE(?Test7)
         TEXT,AT(1,150),FULL,USE(txt),HVSCROLL
     END
     CODE
@@ -79,6 +80,7 @@ Window WINDOW('ST Ascii85 Test of Geoffs Functions '),AT(,,400,200),CENTER,GRAY,
         OF ?Test4       ; DO Test4Rtn
         OF ?Test5       ; DO Test5Rtn 
         OF ?Test6       ; DO Test6Rtn 
+        OF ?Test7       ; DO Test7Rtn 
         END
         CASE FIELD()
         END
@@ -218,7 +220,45 @@ A USHORT
            Break
        END 
   END
-    
+
+
+Test7Rtn ROUTINE  !------------------------------------------------------ 
+    DATA
+Bang      BigBangTheory 
+LoadLen LONG 
+STencode  StringTheory
+STdecode  StringTheory  
+Time1 LONG  
+Time2 LONG 
+
+    CODE
+  IF ~STencode.LoadFile('ClaRun.DLL') THEN 
+      Message('LoadFile ClaRun.DLL Failed ' & STencode.winErrorCode )
+      EXIT
+  END       
+  LoadLen = STencode.Length() 
+
+    Time1=CLOCK()
+    Ascii85Encode(STencode)
+    Time2=CLOCK()
+
+    Message((Time2-Time1)/100 & ' seconds to Encode {50}' & |
+            '||File loaded Bytes<9>=' & LoadLen & |
+            '||Encoded Length<9>=' & STencode.Length() , |
+            'Encode ClaRun.DLL',,'Decode 1 Seconds') 
+
+   STdecode.SetValue(STencode) 
+
+    Time1=CLOCK()
+    Ascii85Decode(STdecode)
+    Time2=CLOCK()
+
+    Message((Time2-Time1)/100 & ' seconds to Decode {50}' & |
+            '||File loaded Bytes<9>=' & LoadLen & |
+            '||Decode Length<9>=' & STdecode.Length() , |
+            'Decode ClaRun.DLL') 
+   
+  
 !========================================================================================
 DB   PROCEDURE(STRING xMessage)
 Prfx EQUATE('ScratchST: ')
@@ -244,6 +284,7 @@ y        long,auto
 padChars long,auto
 outLen   long,auto
 out5     String(5),auto
+Byt5     BYTE,DIM(5),OVER(Out5)  !NOT much diff 2.49 versus 2.53
 
   CODE
   if ~pSt._DataEnd then return.
@@ -267,13 +308,16 @@ out5     String(5),auto
     myStr[4] = pSt.valueptr[x]
     if ~myLong then st.append('z'); cycle.  ! short form for 0 (low-values)
     if ~pAdobe and ~myStr then st.append('y'); cycle. ! short form for spaces - not supported by Adobe
-    out5[5] = chr(myULong%85 + 33)          ! use Ulong first time in case top bit is on
+   !out5[5] = chr(myULong%85 + 33)          ! use Ulong first time in case top bit is on
+    byt5[5] = myULong%85 + 33               ! use Ulong first time in case top bit is on
     myUlong /= 85
     loop y = 4 to 2 by -1
-      out5[y] = chr(myLong%85 + 33)         ! use long where possible as faster
+     !out5[y] = chr(myLong%85 + 33)         ! use long where possible as faster
+      byt5[y] = myLong%85 + 33               ! use long where possible as faster
       mylong /= 85
     end
-    out5[1] = chr(myLong + 33)
+   !out5[1] = chr(myLong + 33)
+    byt5[1] = myLong + 33
     st.append(out5)
   end
   if padChars then st.setLength(st._DataEnd - padChars).
@@ -314,7 +358,7 @@ padChars long
       of 33 to 117
         y += 1
         if y < 5
-          myLong = (myLong * 85) + val(pSt.valueptr[x]) - 33
+          myLong = (myLong * 85) + val(pSt.valueptr[x]) - 33   !<-- Speed up with LONG Math? YES BIG TIME
         else
           myUlong = (myUlong * 85) + val(pSt.valueptr[x]) - 33 
           st.append(myStr[4])

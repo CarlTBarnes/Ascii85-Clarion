@@ -1,6 +1,6 @@
 !Test CbAscii85Class 
   PROGRAM   
-
+    INCLUDE('SystemString.INC'),ONCE
     INCLUDE('CbAscii85.INC'),ONCE
 Ascii85  CbAscii85Class   
 NoWrap85 CbAscii85Class   
@@ -27,7 +27,8 @@ PassFail BYTE  !1=Pass 2=Fail
 IconPass EQUATE(Icon:Tick)   
 IconFail EQUATE(Icon:Cross)   
   CODE
-  SYSTEM{PROP:MsgModeDefault}=MSGMODE:CANCOPY
+  SYSTEM{PROP:MsgModeDefault}=MSGMODE:CANCOPY  
+  !DO FileTestRtn !; return 
   !GOTO Zero0000Label:
   !GOTO LengthTestsLabel:
   !GOTO All256Label:
@@ -205,8 +206,9 @@ Zero0000Label:  !-- Test 4 Char Zeros compressed to 'z'
      Message('Ruby Decode FAILED') 
   END 
 
+  DO FileTestRtn
   DO WrapCheckRtn
-  
+!------------------------------  
 WrapCheckRtn ROUTINE 
     !Verify line wrapping at 75. Can have a 74 line if "~>" would push it to 76
     !I think I would rather have a 76 byte line than the ~> on its own
@@ -219,7 +221,59 @@ WrapCheckRtn ROUTINE
                 'Continue|Stop',,MSGMODE:FIXEDFONT + MSGMODE:CANCOPY ) THEN BREAK.
     END         
     EXIT 
+!------------------------------    
+FileTestRtn ROUTINE !Test if a Bug file can be Encoded and Decoded 
+    DATA
+SSC  SystemStringClass
+Time1 LONG  
+Time2 LONG 
+    CODE     
+    IF SSC.FromFile('ClaRun.DLL') THEN 
+       Message('FromFile ClaRun.DLL Failed ')
+       EXIT 
+    END        
+    Message('ClaRun.DLL file loaded Length ' & SSC.Length() &|
+            '||Click ok to Encode, it takes 3 seconds','File Test',,'Encode 3 Seconds') 
     
+    Time1=CLOCK()
+    Result = Ascii85.EncodeString(SSC.GetStringRef()) !Has 42,732 <00,00,00,00>
+    Time2=CLOCK()
+       IF ~Result THEN 
+           Message('File Encode Failed ' & Ascii85.ErrorMsg,'File Test',IconFail )
+           EXIT 
+       END     
+    Message((Time2-Time1)/100 & ' seconds to encode {50}' & |
+            '||File loaded Bytes<9>=' & SSC.Length() & |
+            '||Encoded Length<9>=' & Ascii85.EncodedLen & |
+            '   Size=' & Ascii85.EncodedSize & |
+            '|Extra=' & Ascii85.EncodedSize-Ascii85.EncodedLen  , |
+            'Encode ClaRun.DLL',,'Decode 1 Seconds') 
+
+    Time1=CLOCK()
+    Result = Ascii85.DecodeString(Ascii85.EncodedStr) 
+    Time2=CLOCK()
+       IF ~Result THEN 
+           Message('File DecodeString Failed ' & Ascii85.ErrorMsg,'File Tests',IconFail )
+           
+       ELSIF Ascii85.DecodedStr &= NULL THEN
+           Message('DecodeString return True but is NULL ','File Tests',IconFail )
+       
+       ELSIF Ascii85.DecodedStr <> SSC.GetString() THEN 
+           Message('File DecodeString Does NOT Match Encode' & |
+                   '||File Lengfth='  & SSC.Length() &'|Decoded length=' & Ascii85.DecodedLen |
+                   ,'Decode ClaRun.DLL',IconFail )
+
+       ELSE 
+           Message((Time2-Time1)/100 & ' seconds to decode {50}||File DecodeString PASSED' & |
+                   '||Input File Length<9>='  & SSC.Length() &|
+                   '|Decoded length<9>=' & Ascii85.DecodedLen |
+                   ,'Decode ClaRun.DLL',IconPass )
+           
+       END 
+    EXIT     
+
+!---------------------------------------------    
+
 ReadMeCodeRtn ROUTINE
 
   IF ~Ascii85.DecodeString(LeviEncoded)  THEN 
