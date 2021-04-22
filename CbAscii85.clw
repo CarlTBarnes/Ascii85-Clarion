@@ -72,8 +72,7 @@ S2   LONG,AUTO
 SX   LONG,AUTO
 Len_Prfx  BYTE,AUTO
 Len_Sufx  BYTE,AUTO
-count       LONG 
-processChar BOOL,AUTO 
+count LONG,AUTO  
 cb BYTE,AUTO
 UL ULONG,AUTO 
     CODE   
@@ -113,56 +112,59 @@ UL ULONG,AUTO
     SELF.DecodedStr &= NEW(STRING(SELF.DecodedSize))
     SELF.DecodedLen = 0
 
-    SELF._tuple=0
+    SELF._tuple=0 ; count=0
     CLEAR(SELF._decodedBlock[])
-    LOOP SX=S1 TO S2            !foreach (char c in s)
+    LOOP SX=S1 TO S2      !foreach (char c in s)
         cb=val(S85[Sx])
-        CASE cb  !switch (c)
-        
-            OF VAL('z')
-                if count <> 0 then 
-                    SELF.ErrorMsg='The character "z" is invalid inside an ASCII85 block, found at position ' & SX
-                    RETURN False
-                end 
-                CLEAR(SELF._decodedBlock[]) !Set to 0,0,0,0
-                SELF.DecodeBlock(4)
-                processChar = false
+        CASE cb           !switch (c)
+            OF 33 to 117  !of '!' to 'u'     !04/21/21 refactor this code block up here
+               count += 1
+               UL = (cb - _asciiOffset) * pow85[count]   !Calc as ULONG to avoid negative
+               SELF._tuple += UL                         !Sum as ULONG
+               if count = 5 then
+                  SELF.DecodeBlock(4)
+                  SELF._tuple=0
+                  count=0
+               end
 
-            ! case '\n':  case '\r':  case '\t': case '\0':  case '\f':   case '\b':              
-            OF   10 OROF 13 OROF 9 OROF 0 OROF 12 OROF 8  
-            OROF 11 OROF 32     !Was missing /v 11 and Space. C Library isspace() ' '	 /n /t /v /f /r 
-                processChar = false
+            OF 122 !of 'z'
+               if count <> 0 then
+                  SELF.ErrorMsg='The character "z" is invalid inside an ASCII85 block, found at position ' & SX
+                  RETURN False
+               end
+               CLEAR(SELF._decodedBlock[]) !Set to 0,0,0,0
+               SELF.DecodeBlock(4)
 
-            ELSE !default:
-                if cb < val('!') or cb > val('u') then  ! if (c < '!' || c > 'u')
-                    SELF.ErrorMsg='Bad character "' & CHOOSE(cb>=33 AND cb<=126,CHR(cb),'('& cb & ')') &'" found at position ' & SX & | 
-                                  '. ASCII85 only allows characters ! to u (33-117).'
-                    
-                    RETURN False
-                    !throw new Exception("Bad character '" + c + "' found. ASCII85 only allows characters '!' to 'u'.");
-                end
-                processChar = true
+              ! '\n'  '\r'   '\t'   '\0'    '\f'   '\b'
+            OF   10 OROF 13 OROF 9 OROF 0 OROF 12 OROF 8
+            OROF 11 OROF 32     !Was missing /v 11 and Space. C Library isspace() ' '	 /n /t /v /f /r
+
+            ELSE
+                SELF.ErrorMsg='Bad character "' & CHOOSE(cb>=33 AND cb<=126,CHR(cb),'('& cb & ')') &'" found at position ' & SX & |
+                              '. ASCII85 only allows characters ! to u (33-117).'
+                RETURN False  !throw new Exception("Bad character '" + c + "' found. ASCII85 only allows characters '!' to 'u'.");
 
         END !CASE cb
 
-        if processChar then 
-           !_tuple += ((uint)(c - _asciiOffset) * pow85[count]);
-           !count++;                !Zero based pow85[] array so ++ after 
-            count += 1              !One  based in Clarion so ++ before
-
-           !Below right side is being calculated as LONG and going negative and WRONG on high ASCII
-           !alternate change, changed Pow85 from LONG to ULONG. Leaving UL here as obvious
-!            SELF._tuple += (cb - _asciiOffset) * pow85[count]   !<- Wrong High ASCII
-            UL = (cb - _asciiOffset) * pow85[count]   !Calc as ULONG 
-            SELF._tuple += UL                         !Sum as ULONG
-
-            if count = 5 then           ! count=_encodedBlock.Length)                     
-                SELF.DecodeBlock(4)     !Appends .DecodedStr
-                SELF._tuple = 0
-                count = 0
-            end !If                            
-        end ! if (processChar)
-    END !LOOP SX=S1 TO S2 }
+!04/21/21 refactor this code block and move first into CASE OF '!' TO 'u'
+!        if processChar then
+!           !_tuple += ((uint)(c - _asciiOffset) * pow85[count]);
+!           !count++;                !Zero based pow85[] array so ++ after
+!            count += 1              !One  based in Clarion so ++ before
+!
+!           !Below right side is being calculated as LONG and going negative and WRONG on high ASCII
+!           !alternate change, changed Pow85 from LONG to ULONG. Leaving UL here as obvious
+!!            SELF._tuple += (cb - _asciiOffset) * pow85[count]   !<- Wrong High ASCII
+!            UL = (cb - _asciiOffset) * pow85[count]   !Calc as ULONG
+!            SELF._tuple += UL                         !Sum as ULONG
+!
+!            if count = 5 then           ! count=_encodedBlock.Length)
+!                SELF.DecodeBlock(4)     !Appends .DecodedStr
+!                SELF._tuple = 0
+!                count = 0
+!            end !If
+!        end ! if (processChar)
+    END !LOOP SX=S1 TO S2
 
     !-- if we have some bytes left over at the end --
     if count <> 0 then
