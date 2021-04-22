@@ -29,7 +29,8 @@ Ln     LONG
   !GOTO All256Label:
   !DO ReadMeCodeRtn
   !--- Decode Test ---
-  Result = Ascii85.DecodeString(LeviEncoded) 
+  Result = Ascii85.DecodeString(LeviEncoded & |
+                               ' <13,10,9,11,12,32,0>')  !Trailing whitespace
   IF ~Result THEN 
       Message('.DecodeString(LeviEncoded)  Failed Error=' & Ascii85.ErrorMsg ) 
   ELSIF Ascii85.DecodedStr &= NULL THEN 

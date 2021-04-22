@@ -79,14 +79,22 @@ UL ULONG,AUTO
     CODE   
     CLEAR(SELF.ErrorMsg) 
     SELF.Kill(1,0)
-    Len_s85=LEN(CLIP(s85)) ; S1=1 ; S2=Len_s85
-        !?? Strip White space off Front and Back ???
+    Len_s85=LEN(CLIP(s85)) 
+    LOOP While Len_s85   !Strip White space off the end so can find ~>
+        CASE VAL(s85[Len_s85])
+        OF 10 OROF 13 OROF 9 OROF 0 OROF 12 OROF 8  OROF 11 OROF 32
+           Len_s85 -= 1
+        ELSE 
+            BREAK
+        END
+    END
+    S1=1 ; S2=Len_s85
     Len_Prfx=LEN(SELF.PrefixMark)
     Len_Sufx=LEN(SELF.SuffixMark)
     !-- strip prefix <~ and suffix ~> if present --
     IF Len_Prfx AND Len_s85 >= Len_Prfx |
     AND s85[1 : Len_Prfx]=SELF.PrefixMark THEN  !if (s.StartsWith(PrefixMark))
-       S1 += Len_Prfx                           ! s = s.Substring(PrefixMark.Length);
+        S1 += Len_Prfx                          ! s = s.Substring(PrefixMark.Length);
     ELSIF SELF.EnforceMarks THEN 
         DO MarksErrorRtn
     END
@@ -113,7 +121,7 @@ UL ULONG,AUTO
         
             OF VAL('z')
                 if count <> 0 then 
-                    SELF.ErrorMsg='The character "z" is invalid inside an ASCII85 block.'
+                    SELF.ErrorMsg='The character "z" is invalid inside an ASCII85 block, found at position ' & SX
                     RETURN False
                 end 
                 CLEAR(SELF._decodedBlock[]) !Set to 0,0,0,0
@@ -127,7 +135,9 @@ UL ULONG,AUTO
 
             ELSE !default:
                 if cb < val('!') or cb > val('u') then  ! if (c < '!' || c > 'u')
-                    SELF.ErrorMsg='Bad character "'& cb & '" found. ASCII85 only allows characters ! to u.'
+                    SELF.ErrorMsg='Bad character "' & CHOOSE(cb>=33 AND cb<=126,CHR(cb),'('& cb & ')') &'" found at position ' & SX & | 
+                                  '. ASCII85 only allows characters ! to u (33-117).'
+                    
                     RETURN False
                     !throw new Exception("Bad character '" + c + "' found. ASCII85 only allows characters '!' to 'u'.");
                 end
