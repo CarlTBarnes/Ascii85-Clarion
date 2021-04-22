@@ -25,6 +25,7 @@ Result BOOL
 Ln     LONG   
   CODE
   SYSTEM{PROP:MsgModeDefault}=MSGMODE:CANCOPY
+  !GOTO Zero0000Label:
   !GOTO LengthTestsLabel:
   !GOTO All256Label:
   !DO ReadMeCodeRtn
@@ -141,7 +142,47 @@ All256Label:     !--- All 256 Characters --
        All256 = All256[256] & All256  !Rotate so high bye chnages
   END
   Message('High ASCII all 256 test ' & CHOOSE(A=0,'PASSED',' Failed? ' & A ))
- 
+
+!===============================================================
+Zero0000Label:  !-- Test 4 Char Zeros compressed to 'z'   
+  LOOP A=1 TO 20
+       EXECUTE A
+           All256=ALL(CHR(0),256)
+           All256=ALL('aaaa<0,0,0,0>',256)             !Test 2
+           All256=ALL('<0,0,0,0>aaaa',256)
+           All256=ALL('<0,0,0>aaaa',256)               !#4 has 3 x 00
+           All256=ALL('<0,0,0,0,0>aaaa',256)           !#5 has 5 x 00
+           All256=ALL('<81h,82,83h,84h,0,0,0,0>',256)
+           All256=ALL('<0,0,0,0,81h,82,83h,84h>',256) 
+           All256='<A1h,34h,CCh,15h,72h,DBh,9Dh,76h,28h>' & ALL(CHR(0),256) ! Test End
+       ELSE   
+           BREAK 
+       END
+       
+       Result = Ascii85.EncodeString(All256,256)
+       IF ~Result THEN 
+           Message('Zero Test #'& A &' Encode FAILED ' & Ascii85.ErrorMsg,,ICON:Cross )
+           Break
+       ELSE 
+         !Worked view encoed to see zzzzzzz 
+!         SETCLIPBOARD('Len=' & Ascii85.EncodedLen &' Size='& Ascii85.EncodedSize &|
+!                      '<13,10>'& Ascii85.EncodedStr) 
+!         Message(CLIPBOARD(),'View Encode Zero #' & A)       
+       END
+       Result = Ascii85.DecodeString(Ascii85.EncodedStr)
+       IF ~Result THEN 
+           Message('Zero Test #'& A &' DecodeString Failed ' & Ascii85.ErrorMsg,,ICON:Cross )
+           Break
+       
+       ELSIF Ascii85.DecodedStr <> All256 THEN  
+           !setclipboard('"' & Ascii85.DecodedStr &'"<13,10>"' & All256 &'"' )
+           Message('FAILED Zero Test #'& A &' DecodeString Does NOT Match Encode' & |
+                  '||Decode Len=' & Ascii85.DecodedLen &' Size=' & Ascii85.DecodedSize ,|
+                  'Zero Test ' & A, ICON:Cross)
+           Break
+       END 
+  END
+  
   !--- Web Example Ruby
   IF ~NoWrap85.EncodeString('Ruby') |
   OR NoWrap85.EncodedStr <> '<<~;KZGo~>' THEN 

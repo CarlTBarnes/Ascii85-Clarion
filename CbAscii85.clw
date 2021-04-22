@@ -72,9 +72,10 @@ S2   LONG,AUTO
 SX   LONG,AUTO
 Len_Prfx  BYTE,AUTO
 Len_Sufx  BYTE,AUTO
-count LONG,AUTO  
+count LONG,AUTO    
 cb BYTE,AUTO
-UL ULONG,AUTO 
+UL ULONG,AUTO
+Zeros LONG 
     CODE   
     CLEAR(SELF.ErrorMsg) 
     SELF.Kill(1,0)
@@ -108,7 +109,10 @@ UL ULONG,AUTO
        RETURN False
     END 
     
-    SELF.DecodedSize = Len_s85 / 5 * 4 + 5
+    LOOP SX=S1 TO S2   !Single 'z' decodes as <0,0,0,0> so need to zllocate 4 bytes
+        IF val(S85[Sx]) = 122 THEN Zeros += 1.  !122='z'
+    END
+    SELF.DecodedSize = (Len_s85 - Zeros) / 5 * 4 + Zeros * 4 + 5
     SELF.DecodedStr &= NEW(STRING(SELF.DecodedSize))
     SELF.DecodedLen = 0
 
