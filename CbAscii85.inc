@@ -58,6 +58,7 @@ ErrorMsg      STRING(128)   !Error set when return False/Failed
 !-------------------
 _decodedBlock   BYTE,DIM(4),PROTECTED   !private byte[] _decodedBlock = new byte[4];
 _tuple          ULONG,PROTECTED         !private uint _tuple = 0;
+_tupLong        LONG,OVER(_tuple),PROTECTED         !faster
 _tupByte        BYTE,DIM(4),OVER(_tuple),PROTECTED  !be faster like Geoff
 _encodedBlock   BYTE,DIM(5),PROTECTED   !private byte[] _encodedBlock = new byte[5];
 _linePos        LONG,PROTECTED          !private int _linePos = 0;

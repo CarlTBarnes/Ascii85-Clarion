@@ -14,7 +14,7 @@ Pow85Grp     GROUP
     LONG(85)
     LONG(1)
              END
-pow85 LONG,DIM(5),OVER(Pow85Grp) !private uint[] pow85 = { 85*85*85*85, 85*85*85, 85*85, 85, 1 };       
+pow85 LONG,DIM(5),OVER(Pow85Grp) !private uint[] pow85 = { 85*85*85*85, 85*85*85, 85*85, 85, 1 };
 !----------------------------------------
 CbAscii85Class.Construct        PROCEDURE()
 !----------------------------------------
@@ -266,11 +266,18 @@ b  BYTE,AUTO
 !-----------------------------------------    
 CbAscii85Class.EncodeBlock PROCEDURE(BYTE count)
 i LONG,AUTO  
-    CODE 
-    LOOP i = 5 TO 1 BY -1       ! for (int i = _encodedBlock.Length - 1; i >= 0; i--)
-        SELF._encodedBlock[i] = (SELF._tuple % 85) + _asciiOffset
-        SELF._tuple /= 85
-    END
+    CODE
+!    LOOP i = 5 TO 1 BY -1       ! for (int i = _encodedBlock.Length - 1; i >= 0; i--)
+!        SELF._encodedBlock[i] = (SELF._tuple % 85) + _asciiOffset
+!        SELF._tuple /= 85
+!    END    
+!---
+    SELF._encodedBlock[5] = SELF._tuple   % 85 + 33 ; SELF._tuple /= 85
+    SELF._encodedBlock[4] = SELF._tupLong % 85 + 33 ; SELF._tupLong /= 85
+    SELF._encodedBlock[3] = SELF._tupLong % 85 + 33 ; SELF._tupLong /= 85
+    SELF._encodedBlock[2] = SELF._tupLong % 85 + 33 ; SELF._tupLong /= 85
+    SELF._encodedBlock[1] = SELF._tupLong % 85 + 33 ! no need  SELF._tupLong /= 85
+
     LOOP i=1 TO count           ! for (int i = 0; i < count; i++)
         SELF.AppendChar(SELF._encodedBlock[i])   
     END 
@@ -293,21 +300,14 @@ CbAscii85Class.AppendString PROCEDURE(string s)
     RETURN 
 
 !-------------------------------------------------
-CbAscii85Class.AppendChar PROCEDURE(BYTE Chr1) 
+CbAscii85Class.AppendChar PROCEDURE(BYTE Chr1)
     CODE 
-    IF SELF.LineLength > 0 AND SELF._linePos + 1 > SELF.LineLength THEN 
+    IF SELF._linePos >= SELF.LineLength AND SELF.LineLength THEN 
        SELF._linePos = 0
        SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<13>'
        SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<10>'
     END 
-
     SELF.EncodedLen += 1 
     SELF.EncodedStr[SELF.EncodedLen] = CHR(Chr1)  !sb.Append(c)
     SELF._linePos += 1
-!04/21/21 Moved up before append so do not leave uneeded 13,10
-!    IF SELF.LineLength > 0 AND (SELF._linePos >= SELF.LineLength) THEN 
-!       SELF._linePos = 0
-!       SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<13>'
-!       SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<10>'
-!    END 
-    RETURN         
+    RETURN
