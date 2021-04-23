@@ -47,6 +47,7 @@ G_Lne  StringTheory
 PassFail BYTE  !1=Pass 2=Fail
 IconPass EQUATE(Icon:Tick)   
 IconFail EQUATE(Icon:Cross)
+Split75  BYTE(1)
     CODE
     TestCode()
     RETURN
@@ -62,6 +63,7 @@ Window WINDOW('ST Ascii85 Test of Geoffs Functions '),AT(,,400,200),CENTER,GRAY,
         BUTTON('5. Various Length Tests'),AT(9,90),USE(?Test5)
         BUTTON('6. Hex 0,0,0,0 Z Tests'),AT(9,110),USE(?Test6)
         BUTTON('7. File ClaRun.DLL Encode Test'),AT(9,130),USE(?Test7)
+        CHECK('Encode Split 75'),AT(140,132),USE(Split75)
         TEXT,AT(1,150),FULL,USE(txt),HVSCROLL
     END
     CODE
@@ -190,7 +192,12 @@ STencode  StringTheory
 STdecode  StringTheory 
 All256    STRING(256)
 A USHORT
-    CODE
+bAdobe  BYTE(1)
+    CODE 
+  !Below line works out the Encoded value that Decodes to 'Spaces----' is <9Eh,7Dh,5Ah,23h,FFh,94h,4Ah,82h>
+  !STencode.SetValue('Spaces----') ; Ascii85Decode(STencode) ; bang.ValueView(STencode,'Spaces')
+  !STencode.SetValue('-----') ; Ascii85Decode(STencode) ; bang.ValueView(STencode,'Spaces')
+
   !04/22/21 Added 'z' to 0,0,0,0 Zero test  .
   !         No change to Ascii85Decode, let StringTheory append expand string
   LOOP A=1 TO 20
@@ -202,13 +209,16 @@ A USHORT
            All256=ALL('<0,0,0,0,0>aaaa',256)           !#5 has 5 x 00
            All256=ALL('<81h,82,83h,84h,0,0,0,0>',256)
            All256=ALL('<0,0,0,0,81h,82,83h,84h>',256) 
+           All256='<9Eh,7Dh,5Ah,23h,FFh,94h,4Ah,82h>' & |   !#8  Spaces----
+                    ALL(' {16}<25h,C8h,02h,1Ch>',256)       !    16 Spaces -----
+           bAdobe=0                                         !#9 Spaces----yyyy----
            All256='<A1h,34h,CCh,15h,72h,DBh,9Dh,76h,28h>' & ALL(CHR(0),256) ! Test End
        ELSE   
            BREAK 
        END
 
        STencode.SetValue(All256) 
-       Ascii85Encode(STencode)
+       Ascii85Encode(STencode,,bAdobe)
        Bang.ValueView(STencode,'Zero Encode Test #' & A) 
 
        STdecode.SetValue(STencode) 
@@ -239,7 +249,7 @@ Time2 LONG
   LoadLen = STencode.Length() 
 
     Time1=CLOCK()
-    Ascii85Encode(STencode)
+    Ascii85Encode(STencode,CHOOSE(~Split75,0,75))
     Time2=CLOCK()
 
     Message((Time2-Time1)/100 & ' seconds to Encode {50}' & |
@@ -277,14 +287,26 @@ Ascii85Encode        PROCEDURE  (StringTheory pSt,Long pWrapLen=75,Bool pAdobe=1
 st       StringTheory
 myLong   long,auto
 myULong  ulong,over(myLong)
-myStr    String(4),over(myLong)
+!myStr    String(4),over(myLong)   !CArl change to IF =20202020h
+myGrp    group,pre(),over(myLong)
+myStr1     string(1)
+myStr2     string(1)
+myStr3     string(1)
+myStr4     string(1)
+         end ! group
 tempStr  String(4),auto        
 x        long,auto
 y        long,auto
 padChars long,auto
 outLen   long,auto
-out5     String(5),auto
-Byt5     BYTE,DIM(5),OVER(Out5)  !NOT much diff 2.49 versus 2.53
+outstr   String(5),auto
+outGrp   group,pre(),over(outStr)
+out1       byte
+out2       byte
+out3       byte
+out4       byte
+out5       byte
+         end ! group
 
   CODE
   if ~pSt._DataEnd then return.
@@ -294,7 +316,7 @@ Byt5     BYTE,DIM(5),OVER(Out5)  !NOT much diff 2.49 versus 2.53
   if padChars then padChars = 4 - padChars; pSt.append(all('<0>',padChars)).   ! pad with null chars
   outLen = (pSt._DataEnd * 5 / 4) + choose(~pAdobe,0,4)   ! adobe has 4 extra chars
   if pWraplen then outlen += 2 * int(outlen / pWrapLen).  ! add 2 chars for each line break  
-  st.SetLength(outlen)  ! preallocate output memory (optional)
+  st.SetLength(outlen)  ! optional: preallocate output memory
   if pAdobe 
     st.setValue('<<~')
   else
@@ -302,23 +324,24 @@ Byt5     BYTE,DIM(5),OVER(Out5)  !NOT much diff 2.49 versus 2.53
   end
   loop x = 1 to pSt._DataEnd by 4
     ! swap endian-ness as we go...
-    myStr[1] = pSt.valueptr[x+3]
-    myStr[2] = pSt.valueptr[x+2]
-    myStr[3] = pSt.valueptr[x+1]
-    myStr[4] = pSt.valueptr[x]
+    myStr1 = pSt.valueptr[x+3]
+    myStr2 = pSt.valueptr[x+2]
+    myStr3 = pSt.valueptr[x+1]
+    myStr4 = pSt.valueptr[x]
     if ~myLong then st.append('z'); cycle.  ! short form for 0 (low-values)
-    if ~pAdobe and ~myStr then st.append('y'); cycle. ! short form for spaces - not supported by Adobe
-   !out5[5] = chr(myULong%85 + 33)          ! use Ulong first time in case top bit is on
-    byt5[5] = myULong%85 + 33               ! use Ulong first time in case top bit is on
+!Geoff    if ~pAdobe and ~myStr then st.append('y'); cycle. ! short form for spaces - not supported by Adobe
+    if ~pAdobe and myLong=20202020h then st.append('y'); cycle. !Carl faster Long compare
+    out5 = myULong%85 + 33          ! use Ulong first time in case top bit is on
     myUlong /= 85
-    loop y = 4 to 2 by -1
-     !out5[y] = chr(myLong%85 + 33)         ! use long where possible as faster
-      byt5[y] = myLong%85 + 33               ! use long where possible as faster
-      mylong /= 85
-    end
-   !out5[1] = chr(myLong + 33)
-    byt5[1] = myLong + 33
-    st.append(out5)
+    ! unrolled the loop - we use long here as faster
+    out4 = myLong%85 + 33
+    mylong /= 85
+    out3 = myLong%85 + 33
+    mylong /= 85
+    out2 = myLong%85 + 33
+    mylong /= 85
+    out1 = myLong%85 + 33
+    st.append(outStr)
   end
   if padChars then st.setLength(st._DataEnd - padChars).
   if pAdobe   then st.append('~>').
@@ -331,14 +354,23 @@ Byt5     BYTE,DIM(5),OVER(Out5)  !NOT much diff 2.49 versus 2.53
     end
     st.join('<13,10>')
   end
+!  pSt._StealValue(st)    ! point our passed object to our output
   pSt.SetValue(st)    !  pSt._StealValue(st)    ! point our passed object to our output
   RETURN 
 !==========================================================
-Ascii85Decode        PROCEDURE  (StringTheory pSt)
+Ascii85Decode        PROCEDURE  (StringTheory pSt) 
 st       StringTheory
 myLong   long
 myUlong  ulong,over(myLong)
 myStr    String(4),over(myLong)
+myGrp    group,pre(),over(myLong)
+myStr1     string(1)
+myStr2     string(1)
+myStr3     string(1)
+myStr4     string(1)
+         end ! group
+CurValue long,auto   ! value of current character
+swapStr  string(1)
 x        long
 y        long
 padChars long
@@ -347,27 +379,35 @@ padChars long
   if pSt._DataEnd > 3 and pSt.startsWith('<<~') and pSt.endsWith('~>') 
     pSt.crop(3, pSt._DataEnd-2)  ! remove Adobe begin/end chars
   end
+  st.setLength(pSt._DataEnd); free(st)  ! preallocate some space (optional)
   x = 1
-  loop 5 times
+  loop !5 times
     loop x = x to pSt._DataEnd
-      case val(pSt.valueptr[x]) 
-      of 122; st.append('<0,0,0,0>')      !z used for zeroes (low-values)
-      of 121; st.append('<32,32,32,32>')  !y used for spaces
-
-!Carl FYI: It would be faster to move the "of 33 to 117" to be first since it is the most common. 
+      curValue = val(pSt.valueptr[x])
+      case curValue
       of 33 to 117
         y += 1
         if y < 5
-          myLong = (myLong * 85) + val(pSt.valueptr[x]) - 33   !<-- Speed up with LONG Math? YES BIG TIME
+          myLong = myLong*85 + curValue - 33
         else
-          myUlong = (myUlong * 85) + val(pSt.valueptr[x]) - 33 
-          st.append(myStr[4])
-          st.append(myStr[3])
-          st.append(myStr[2])
-          st.append(myStr[1])
+          myUlong = myUlong*85 + curValue - 33
+          ! swap endian-ness (reverse byte order)
+!          st.append(myStr4)
+!          st.append(myStr3)
+!          st.append(myStr2)
+!          st.append(myStr1)
+          swapStr = myStr1
+          myStr1  = myStr4
+          myStr4  = swapStr
+          swapStr = myStr2
+          myStr2  = myStr3
+          myStr3  = swapStr
+          st.append(myStr)
           y = 0
           myLong = 0
         end
+      of 122; st.append('<0,0,0,0>')      !z used for zeroes (low-values)
+      of 121; st.append('<32,32,32,32>')  !y used for spaces
       end !case
     end
     if y ! padding required? 
@@ -378,5 +418,6 @@ padChars long
     end
   end
   if padChars then st.setLength(st._DataEnd - padChars).
+!  pSt._StealValue(st)    ! point our passed object to our output
   pSt.SetValue(st)    ! pSt._StealValue(st)    ! point our passed object to our output
   RETURN 
