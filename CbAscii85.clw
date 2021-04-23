@@ -109,7 +109,9 @@ Zeros LONG
     END 
     
     LOOP SX=S1 TO S2   !Single 'z' decodes as <0,0,0,0> so need to zllocate 4 bytes
-        IF val(S85[Sx]) = 122 THEN Zeros += 1.  !122='z'
+        CASE VAL(S85[SX]) 
+        OF 122 OROF  121 ; Zeros += 1  !'z' 4 x 00h or 'y' is 4 x Spaces
+        END
     END ! ; IF Zeros THEN message('Zeros=' & Zeros).
     SELF.DecodedSize = (Len_s85 - Zeros) / 5 * 4 + Zeros * 4 + 5
     SELF.DecodedStr &= NEW(STRING(SELF.DecodedSize))
@@ -126,7 +128,6 @@ Zeros LONG
                SELF._tuple += UL                         !Sum as ULONG
                if count = 5 then
                   SELF.DecodeBlock(4)
-                  SELF._tuple=0
                   count=0
                end
 
@@ -135,9 +136,20 @@ Zeros LONG
                   SELF.ErrorMsg='The character "z" is invalid inside an ASCII85 block, found at position ' & SX
                   RETURN False
                end
-               CLEAR(SELF._decodedBlock[]) !Set to 0,0,0,0
+               SELF._tuple=0 ! CLEAR(SELF._decodedBlock[]) !Set to 0,0,0,0
                SELF.DecodeBlock(4)
 
+            OF 121 !of 'y'
+               if ~SELF.Y_4_Spaces then
+                  SELF.ErrorMsg='Bad character "y" at position ' & SX & ' n/a in Adobe ASCII85'
+                  RETURN False  !throw new Exception("Bad character '" + c + "' found. ASCII85 only allows characters '!' to 'u'.");
+               elsif count <> 0 then
+                  SELF.ErrorMsg='The character "y" is invalid inside an ASCII85 block, found at position ' & SX
+                  RETURN False
+               end
+               SELF._tuple=20202020h !Set to 4 spaces
+               SELF.DecodeBlock(4)
+               
               ! '\n'  '\r'   '\t'   '\0'    '\f'   '\b'
             OF   10 OROF 13 OROF 9 OROF 0 OROF 12 OROF 8
             OROF 11 OROF 32     !Was missing /v 11 and Space. C Library isspace() ' '	 /n /t /v /f /r
@@ -148,26 +160,7 @@ Zeros LONG
                 RETURN False  !throw new Exception("Bad character '" + c + "' found. ASCII85 only allows characters '!' to 'u'.");
 
         END !CASE cb
-
-!04/21/21 refactor this code block and move first into CASE OF '!' TO 'u'
-!        if processChar then
-!           !_tuple += ((uint)(c - _asciiOffset) * pow85[count]);
-!           !count++;                !Zero based pow85[] array so ++ after
-!            count += 1              !One  based in Clarion so ++ before
-!
-!           !Below right side is being calculated as LONG and going negative and WRONG on high ASCII
-!           !alternate change, changed Pow85 from LONG to ULONG. Leaving UL here as obvious
-!!            SELF._tuple += (cb - _asciiOffset) * pow85[count]   !<- Wrong High ASCII
-!            UL = (cb - _asciiOffset) * pow85[count]   !Calc as ULONG
-!            SELF._tuple += UL                         !Sum as ULONG
-!
-!            if count = 5 then           ! count=_encodedBlock.Length)
-!                SELF.DecodeBlock(4)     !Appends .DecodedStr
-!                SELF._tuple = 0
-!                count = 0
-!            end !If
-!        end ! if (processChar)
-    END !LOOP SX=S1 TO S2
+    END     !LOOP SX
 
     !-- if we have some bytes left over at the end --
     if count <> 0 then
@@ -175,11 +168,9 @@ Zeros LONG
             SELF.ErrorMsg='The last block of ASCII85 data cannot be a single byte.'
             RETURN False
         end !if (count = 1)
-        count -= 1
-        SELF._tuple += pow85[count+1]
-        SELF.DecodeBlock(count)        !also does ms.WriteByte(_decodedBlock[i]);
+        SELF._tuple += pow85[count]
+        SELF.DecodeBlock(count-1)
     end !if (count <> 0)    
-
     RETURN True 
 
 MarksErrorRtn ROUTINE
@@ -193,10 +184,12 @@ i BYTE,AUTO
     CODE 
     LOOP i=1 TO bytes  !        for (int i = 0; i < bytes; i++)
 !         _decodedBlock[i] = (byte)(_tuple >> 24 - (i * 8));   ! >> Right Shift
-         SELF._decodedBlock[i] = BSHIFT(SELF._tuple, -24 + (i-1) * 8) 
+!         SELF._decodedBlock[i] = BSHIFT(SELF._tuple, -24 + (i-1) * 8) 
+         SELF._decodedBlock[i] = SELF._tupByte[5-i]
          SELF.DecodedLen += 1
          SELF.DecodedStr[ SELF.DecodedLen ] = CHR(SELF._decodedBlock[i] )
-    END 
+    END
+    SELF._tuple=0
     RETURN    
 
 !===========================================================================
@@ -240,6 +233,8 @@ b  BYTE,AUTO
             SELF._tupByte[1] = b  !SELF._tuple = BOR(SELF._tuple,b)     ! _tuple |= b;
             if SELF._tuple = 0 then 
                SELF.AppendChar(122) !('z')
+            elsif SELF.Y_4_Spaces and SELF._tuple = 20202020h then 
+               SELF.AppendChar(121) !('y')
             else
                SELF.EncodeBlock(5)
             end 

@@ -27,6 +27,7 @@ LineLength   USHORT     !Default 75    Maximum line length for encoded ASCII85 s
 EnforceMarks bool       !Default TRUE  Add the Prefix and Suffix marks when encoding, and enforce their presence for decoding
 PrefixMark   PSTRING(8) !Default "<~"  Prefix mark that identifies an encoded ASCII85 string, traditionally '<~'
 SuffixMark   PSTRING(8) !Default "~>"  Suffix mark that identifies an encoded ASCII85 string, traditionally '~>'
+Y_4_Spaces   bool       !Default False Like 'z' for Spaces, not Adobe compat, BtoA v4.2
 
 !Methods
 !-------------
@@ -56,7 +57,7 @@ ErrorMsg      STRING(128)   !Error set when return False/Failed
 
 !Properties Internal
 !-------------------
-_decodedBlock   BYTE,DIM(4),PROTECTED   !private byte[] _decodedBlock = new byte[4];
+_decodedBlock   BYTE,DIM(4),PROTECTED
 _tuple          ULONG,PROTECTED         !private uint _tuple = 0;
 _tupLong        LONG,OVER(_tuple),PROTECTED         !faster
 _tupByte        BYTE,DIM(4),OVER(_tuple),PROTECTED  !be faster like Geoff
