@@ -1,7 +1,13 @@
 !Test CbAscii85Class 
   PROGRAM   
     INCLUDE('SystemString.INC'),ONCE
-    INCLUDE('CbAscii85.INC'),ONCE
+    INCLUDE('CbAscii85.INC'),ONCE 
+
+!This requires String Theory, version coming that does not 
+!    INCLUDE('BigBangTheory.INC'),ONCE   !From  https://github.com/CarlTBarnes/StringTheory-Tools
+!    Project Defines or GPF: StringTheoryLinkMode=>1;StringTheoryDllMode=>0
+!G_Bang BigBangTheory        !use to view strings and hex
+
 Ascii85  CbAscii85Class   
 NoWrap85 CbAscii85Class   
   MAP
@@ -158,6 +164,7 @@ All256Label:     !--- All 256 Characters --
 !===============================================================
 Zero0000Label:  !-- Test 4 Char Zeros compressed to 'z'   
   LOOP A=1 TO 20
+       Ascii85.Y_4_Spaces=FALSE     !Reset to Adobe compat without 'y'
        EXECUTE A
            All256=ALL(CHR(0),256)
            All256=ALL('aaaa<0,0,0,0>',256)             !Test 2
@@ -165,7 +172,10 @@ Zero0000Label:  !-- Test 4 Char Zeros compressed to 'z'
            All256=ALL('<0,0,0>aaaa',256)               !#4 has 3 x 00
            All256=ALL('<0,0,0,0,0>aaaa',256)           !#5 has 5 x 00
            All256=ALL('<81h,82,83h,84h,0,0,0,0>',256)
-           All256=ALL('<0,0,0,0,81h,82,83h,84h>',256) 
+           All256=ALL('<0,0,0,0,81h,82,83h,84h>',256)
+           All256='<9Eh,7Dh,5Ah,23h,FFh,94h,4Ah,82h>' & |   !#8  Spaces----
+                    ALL(' {16}<25h,C8h,02h,1Ch>',256)       !    16 Spaces -----    w/o y
+           Ascii85.Y_4_Spaces=TRUE                          !#9 Spaces----yyyy----  with y                  
            All256='<A1h,34h,CCh,15h,72h,DBh,9Dh,76h,28h>' & ALL(CHR(0),256) ! Test End
        ELSE   
            BREAK 
@@ -176,18 +186,22 @@ Zero0000Label:  !-- Test 4 Char Zeros compressed to 'z'
            Message('Zero Test #'& A &' Encode FAILED ' & Ascii85.ErrorMsg,,IconFail )
            Break
        ELSE 
-         !Worked view encoed to see zzzzzzz 
-!         SETCLIPBOARD('Len=' & Ascii85.EncodedLen &' Size='& Ascii85.EncodedSize &|
-!                      '<13,10>'& Ascii85.EncodedStr) 
-!         Message(CLIPBOARD(),'View Encode Zero #' & A)       
+           IF false THEN  !Worked TRUE to view encoded to see zzzzzzz yyyy
+              SETCLIPBOARD('Len=' & Ascii85.EncodedLen &' Size='& Ascii85.EncodedSize &|
+                          '<13,10>'& Ascii85.EncodedStr) 
+              Message(CLIPBOARD(),'View Encode Zero #' & A)
+           END 
        END
+
        Result = Ascii85.DecodeString(Ascii85.EncodedStr)
        IF ~Result THEN 
            Message('Zero Test #'& A &' DecodeString Failed ' & Ascii85.ErrorMsg,,ICON:Cross )
            Break
        
        ELSIF Ascii85.DecodedStr <> All256 THEN  
-           !setclipboard('"' & Ascii85.DecodedStr &'"<13,10>"' & All256 &'"' )
+           setclipboard('"' & All256 &'"<13,10>"' & Ascii85.DecodedStr &'"<13,10>' )
+!  G_Bang.StringView(All256,'Failed All256')
+!  G_Bang.StringView(Ascii85.DecodedStr,'Failed Ascii85.DecodedStr')
            Message('FAILED Zero Test #'& A &' DecodeString Does NOT Match Encode' & |
                   '||Decode Len=' & Ascii85.DecodedLen &' Size=' & Ascii85.DecodedSize ,|
                   'Zero Test ' & A, IconFail)
@@ -226,50 +240,63 @@ FileTestRtn ROUTINE !Test if a Bug file can be Encoded and Decoded
     DATA
 SSC  SystemStringClass
 Time1 LONG  
-Time2 LONG 
+Time2 LONG
+YTest BYTE 
+YCaption PSTRING(20) 
+File85  CbAscii85Class
     CODE     
-    IF SSC.FromFile('ClaRun.DLL') THEN 
+    !IF SSC.FromFile('BigBangTheory.clw') THEN  !source text file will have many 4 spaces to compress
+    IF SSC.FromFile('ClaRun.DLL') THEN          !This has 54 spaces that are in 4's 
        Message('FromFile ClaRun.DLL Failed ')
        EXIT 
     END        
-    Message('ClaRun.DLL file loaded Length ' & SSC.Length() &|
-            '||Click ok to Encode, it takes 3 seconds','File Test',,'Encode 3 Seconds') 
-    
-    Time1=CLOCK()
-    Result = Ascii85.EncodeString(SSC.GetStringRef()) !Has 42,732 <00,00,00,00>
-    Time2=CLOCK()
-       IF ~Result THEN 
-           Message('File Encode Failed ' & Ascii85.ErrorMsg,'File Test',IconFail )
-           EXIT 
-       END     
-    Message((Time2-Time1)/100 & ' seconds to encode {50}' & |
-            '||File loaded Bytes<9>=' & SSC.Length() & |
-            '||Encoded Length<9>=' & Ascii85.EncodedLen & |
-            '   Size=' & Ascii85.EncodedSize & |
-            '|Extra=' & Ascii85.EncodedSize-Ascii85.EncodedLen  , |
-            'Encode ClaRun.DLL',,'Decode 1 Seconds') 
+    IF Message('ClaRun.DLL file loaded Length ' & SSC.Length() &|
+            '||This will make 2 passes, second tests "Y 4 Spaces"' & |
+            '||Click to Encode, it takes 3 seconds', |
+            'File Test',,'Encode 3 Seconds|Halt') =2 THEN HALT().
 
-    Time1=CLOCK()
-    Result = Ascii85.DecodeString(Ascii85.EncodedStr) 
-    Time2=CLOCK()
-       IF ~Result THEN 
-           Message('File DecodeString Failed ' & Ascii85.ErrorMsg,'File Tests',IconFail )
-           
-       ELSIF Ascii85.DecodedStr &= NULL THEN
-           Message('DecodeString return True but is NULL ','File Tests',IconFail )
-       
-       ELSIF Ascii85.DecodedStr <> SSC.GetString() THEN 
-           Message('File DecodeString Does NOT Match Encode' & |
-                   '||File Lengfth='  & SSC.Length() &'|Decoded length=' & Ascii85.DecodedLen |
-                   ,'Decode ClaRun.DLL',IconFail )
+    LOOP YTest=0 TO 1
+        !File85.LineLength=0
+        File85.Y_4_Spaces = YTest
+        YCaption=CHOOSE(YTest=0,'',' - Y 4 Spaces')
+        Time1=CLOCK()
+        Result = File85.EncodeString(SSC.GetStringRef()) !Has 42,732 <00,00,00,00>
+        Time2=CLOCK()
+           IF ~Result THEN 
+               Message('File Encode Failed ' & File85.ErrorMsg,'File Test' & YCaption,IconFail )
+               EXIT 
+           END     
+        Message((Time2-Time1)/100 & ' seconds to encode' & YCaption & ' {50}' & |
+                '||File loaded Bytes<9>=' & SSC.Length() & |
+                '||Encoded Length<9>=' & File85.EncodedLen & |
+                '   Size=' & File85.EncodedSize & |
+                '||Extra=' & File85.EncodedSize-File85.EncodedLen , |
+                'Encode ClaRun.DLL' & YCaption,,'Decode 1 Second') 
 
-       ELSE 
-           Message((Time2-Time1)/100 & ' seconds to decode {50}||File DecodeString PASSED' & |
-                   '||Input File Length<9>='  & SSC.Length() &|
-                   '|Decoded length<9>=' & Ascii85.DecodedLen |
-                   ,'Decode ClaRun.DLL',IconPass )
+        Time1=CLOCK()
+        Result = File85.DecodeString(File85.EncodedStr) 
+        Time2=CLOCK()
+           IF ~Result THEN 
+               Message('File DecodeString Failed ' & File85.ErrorMsg,'File Tests' & YCaption,IconFail )
+               
+           ELSIF File85.DecodedStr &= NULL THEN
+               Message('DecodeString return True but is NULL ','File Tests' & YCaption,IconFail )
            
-       END 
+           ELSIF File85.DecodedStr <> SSC.GetString() THEN 
+               Message('File DecodeString Does NOT Match Encode' & |
+                       '||File Lengfth='  & SSC.Length() &'|Decoded length=' & File85.DecodedLen |
+                       ,'Decode ClaRun.DLL' & YCaption,IconFail )
+
+           ELSE 
+               Message((Time2-Time1)/100 & ' seconds to decode' & YCaption & ' {50}' & |
+                       '||File DecodeString PASSED' & |
+                       '||Input File Length<9>='  & SSC.Length() &|
+                       '|Decoded length<9>=' & File85.DecodedLen, |
+                       'Decode ClaRun.DLL' & YCaption,IconPass , |
+                       CHOOSE(YTest=0,'Encode Y 4 Spaces','Close') )
+               
+           END 
+       END    !Loop YTest
     EXIT     
 
 !---------------------------------------------    
