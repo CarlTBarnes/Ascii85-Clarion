@@ -3,10 +3,8 @@
     INCLUDE('SystemString.INC'),ONCE
     INCLUDE('CbAscii85.INC'),ONCE 
 
-!This requires String Theory, version coming that does not 
-!    INCLUDE('BigBangTheory.INC'),ONCE   !From  https://github.com/CarlTBarnes/StringTheory-Tools
-!    Project Defines or GPF: StringTheoryLinkMode=>1;StringTheoryDllMode=>0
-!G_Bang BigBangTheory        !use to view strings and hex
+    INCLUDE('BigBangString.INC'),ONCE   !From  https://github.com/CarlTBarnes/StringTheory-Tools
+Bang BigBangString        !use to view strings and hex
 
 Ascii85  CbAscii85Class   
 NoWrap85 CbAscii85Class   
@@ -34,10 +32,11 @@ IconPass EQUATE(Icon:Tick)
 IconFail EQUATE(Icon:Cross)   
   CODE
   SYSTEM{PROP:MsgModeDefault}=MSGMODE:CANCOPY  
-  !DO FileTestRtn !; return 
+  !DO FileTestRtn ; return 
   !GOTO Zero0000Label:
   !GOTO LengthTestsLabel:
-  !GOTO All256Label:
+  !GOTO All256Label:      !Test High Ascii on end and rotate to front
+  !GOTO Hi256LenLabel:    !Test High Ascii at the Front for LONG/ULONG issue
   !DO ReadMeCodeRtn
   !--- Decode Test ---
   Result = Ascii85.DecodeString(LeviEncoded & |
@@ -158,8 +157,44 @@ All256Label:     !--- All 256 Characters --
        All256 = All256[256] & All256  !Rotate so high bye chnages
   END
   PassFail=CHOOSE(A=0,1,2)
-  Message('High ASCII all 256 test ' & CHOOSE(PassFail,'PASSED',' Failed ' & A) |
+  Message('High ASCII all 256 rotate test ' & CHOOSE(PassFail,'PASSED',' Failed ' & A) |
           ,'All 256',CHOOSE(PassFail,IconPass,IconFail))
+
+!===============================================================
+Hi256LenLabel:     !--- High ASCII characters of 256 to 1 byte length
+  NoWrap85.LineLength=75   !No 13,10 to Match my LeviEncoded test
+  LOOP A=1 TO 256 ; All256[A]=CHR(256-A) ; END  
+  !Debug Bang.StringView(All256,'All256 Len Hi Tests')
+  LOOP A=256 TO 1 BY -1
+       All256=SUB(All256,1,A)                 !Change Length
+       Result = NoWrap85.EncodeString(All256,A)
+       IF ~Result THEN 
+           Message('Len A='& A &' Encode Hi Length Failed ' & NoWrap85.ErrorMsg )
+           Break
+       ELSE 
+           ! IF A=256 OR A<5 THEN Bang.StringView(NoWrap85.EncodedStr,'Len Hi 256: NoWrap85.EncodedStr').           
+       END
+       Result = Ascii85.DecodeString(NoWrap85.EncodedStr)
+       IF ~Result THEN 
+           Message('A='& A &' DecodeString Hi 256 Failed ' & Ascii85.ErrorMsg )
+           Break
+       ELSIF Ascii85.DecodedStr &= NULL THEN
+           Message('A='& A &' DecodeString Hi 256 return True but is NULL')
+           Break
+       
+       ELSIF Ascii85.DecodedStr <> All256 THEN  
+           setclipboard('"' & Ascii85.DecodedStr &'"<13,10>"' & All256 &'"' )
+           Message('A='& A &' DecodeString Hi 256 Len Test Does NOT Match Encode' & |
+                  '||Decode Len=' & Ascii85.DecodedLen &' Size=' & Ascii85.DecodedSize ,,IconFail)
+           Break
+       ELSE
+           ! IF A=256 OR A<5 THEN Bang.StringView(Ascii85.DecodedStr,'Len Hi 256: Ascii85.DecodedStr').
+       END 
+       !NO All256 = All256[256] & All256  !Rotate so high bye chnages
+  END
+  PassFail=CHOOSE(A=0,1,2)
+  Message('High ASCII 256 Length tests ' & CHOOSE(PassFail,'PASSED',' Failed ' & A) |
+          ,'Len Hi Ascii',CHOOSE(PassFail,IconPass,IconFail))
 
 !===============================================================
 Zero0000Label:  !-- Test 4 Char Zeros compressed to 'z'   
@@ -200,8 +235,8 @@ Zero0000Label:  !-- Test 4 Char Zeros compressed to 'z'
        
        ELSIF Ascii85.DecodedStr <> All256 THEN  
            setclipboard('"' & All256 &'"<13,10>"' & Ascii85.DecodedStr &'"<13,10>' )
-!  G_Bang.StringView(All256,'Failed All256')
-!  G_Bang.StringView(Ascii85.DecodedStr,'Failed Ascii85.DecodedStr')
+!  Bang.StringView(All256,'Failed All256')
+!  Bang.StringView(Ascii85.DecodedStr,'Failed Ascii85.DecodedStr')
            Message('FAILED Zero Test #'& A &' DecodeString Does NOT Match Encode' & |
                   '||Decode Len=' & Ascii85.DecodedLen &' Size=' & Ascii85.DecodedSize ,|
                   'Zero Test ' & A, IconFail)
@@ -283,7 +318,8 @@ File85  CbAscii85Class
                Message('DecodeString return True but is NULL ','File Tests' & YCaption,IconFail )
            
            ELSIF File85.DecodedStr <> SSC.GetString() THEN 
-               Message('File DecodeString Does NOT Match Encode' & |
+               Message((Time2-Time1)/100 & ' seconds to decode' & YCaption & ' {50}' & |
+                       '||File DecodeString Does NOT Match Encode' & |
                        '||File Lengfth='  & SSC.Length() &'|Decoded length=' & File85.DecodedLen |
                        ,'Decode ClaRun.DLL' & YCaption,IconFail )
 
