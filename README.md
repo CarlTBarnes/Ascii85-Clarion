@@ -1,11 +1,20 @@
 # Ascii85-Clarion - Ascii85 Clarion Class 
 
-Jeff Atwood of Coding Horror published a C# ASCii 85 class on Github that I converted to Clarion.
- I tried to make as few changes as possile to the code.
+ASCII 85 is binary-to-text encoding similar to Base 64 but is more efficient using 5 bytes to encode 4.
+ Read more about in the [Wikipedia ASCII 85 article](https://en.wikipedia.org/wiki/Ascii85).
+
+For discussion of this class see the post on [Clarion Hub post "Converting ASCII85 to Binary"](https://clarionhub.com/t/converting-ascii85-to-binary/4047?u=carlbarnes).
+
+Jeff Atwood of Coding Horror published a C# ASCII 85 class on Github that I converted to Clarion.
+ I tried to make as few changes as possile to the code ... at first
+ ... but then changed the code to work better in Clarion. 
+ One thing I decided to change was Jeff's style of `"IF Invalid THEN Report Error ELSE process data"`. 
+ I flipped that to `"IF Valid THEN process data ELSE Report Error"`. 
+ Is that cleaner code? I'd say yes, as long as the IF logic is just as understandable.
  
 https://github.com/coding-horror/ascii85
  
-The orignal class returned a string. This class .DecodeString() and .EncodeString() methods return True/False.
+The orignal class returned a string. In my class .DecodeString() and .EncodeString() methods return True/False.
  The actual STRING is in .DecodedStr or .EncodedStr.
   If the functions return False these strings will be NULL and crash if you try to use them.
   
@@ -40,3 +49,8 @@ LeviEncoded STRING('<<~9jqo^BlbD-BleB1DJ+*+F(f,q/0JhKF<<GL>Cj@.4Gp$d7F!,L7@<<6@)
   
 
 ```
+
+The included Ascii85.clw project tests the class several ways and shows examples of usage.
+ The FileTo85 example shows using System String Class to read a file and encode, write it, decode and write that.
+ 
+The St_85test example includes Geoff Robinson's String Theory ASCII 85 class and code to test it.
