@@ -6,7 +6,7 @@
     MAP
     END
 
-_asciiOffset EQUATE(33)   !private const int _asciiOffset = 33;
+!_asciiOffset EQUATE(33)   !Val('!') which is first encode char
 Pow85Grp     GROUP
     LONG(85*85*85*85)
     LONG(85*85*85)
@@ -81,7 +81,7 @@ Zeros LONG
     Len_s85=LEN(CLIP(s85)) 
     LOOP While Len_s85   !Strip White space off the end so can find ~>
         CASE VAL(s85[Len_s85])
-        OF 10 OROF 13 OROF 9 OROF 0 OROF 12 OROF 8  OROF 11 OROF 32
+        OF 8 TO 13 OROF 32 OROF 0 
            Len_s85 -= 1
         ELSE 
             BREAK
@@ -122,56 +122,56 @@ Zeros LONG
     LOOP SX=S1 TO S2      !foreach (char c in s)
         cb=val(S85[Sx])
         CASE cb           !switch (c)
-            OF 33 to 117  !of '!' to 'u'     !04/21/21 refactor this code block up here
-               count += 1
-               UL = (cb - _asciiOffset) * pow85[count]   !Calc as ULONG to avoid negative
-               SELF._tuple += UL                         !Sum as ULONG
-               if count = 5 then
-                  SELF.DecodeBlock(4)
-                  count=0
-               end
+        OF 33 to 117  !of '!' to 'u'     !04/21/21 refactor this code block up here
+           count += 1
+           if count < 5 then
+              UL = (cb - 33) * pow85[count]   !Calc as ULONG to avoid negative
+              SELF._tuple += UL               !Sum as ULONG
+           else ! count=5
+              SELF._tuple += (cb - 33)        !04/24/21 =5 save * 1 and UL=
+              SELF.DecodeBlock(4)
+              count=0
+           end
 
-            OF 122 !of 'z'
-               if count <> 0 then
-                  SELF.ErrorMsg='The character "z" is invalid inside an ASCII85 block, found at position ' & SX
-                  RETURN False
-               end
-               SELF._tuple=0 ! CLEAR(SELF._decodedBlock[]) !Set to 0,0,0,0
-               SELF.DecodeBlock(4)
+        OF 122 !of 'z'
+           if ~count then
+              SELF._tuple=0 ! CLEAR(SELF._decodedBlock[]) !Set to 0,0,0,0
+              SELF.DecodeBlock(4)
+           else
+              SELF.ErrorMsg='The character "z" is invalid inside an ASCII85 block, found at position ' & SX
+              RETURN False
+           end
 
-            OF 121 !of 'y'
-               if ~SELF.Y_4_Spaces then
-                  SELF.ErrorMsg='Bad character "y" at position ' & SX & ' n/a in Adobe ASCII85'
-                  RETURN False  !throw new Exception("Bad character '" + c + "' found. ASCII85 only allows characters '!' to 'u'.");
-               elsif count <> 0 then
-                  SELF.ErrorMsg='The character "y" is invalid inside an ASCII85 block, found at position ' & SX
-                  RETURN False
-               end
-               SELF._tuple=20202020h !Set to 4 spaces
-               SELF.DecodeBlock(4)
-               
-              ! '\n'  '\r'   '\t'   '\0'    '\f'   '\b'
-            OF   10 OROF 13 OROF 9 OROF 0 OROF 12 OROF 8
-            OROF 11 OROF 32     !Was missing /v 11 and Space. C Library isspace() ' '	 /n /t /v /f /r
+        OF 121 !of 'y'
+           IF SELF.Y_4_Spaces AND ~count THEN
+              SELF._tuple=20202020h !Set to 4 spaces
+              SELF.DecodeBlock(4)
+           ELSE
+              SELF.ErrorMsg='Bad character "y" at position ' & SX & |
+                            CHOOSE(~SELF.Y_4_Spaces,' n/a in Adobe ASCII85',' invalid inside an ASCII85 block')
+              RETURN False  !throw new Exception("Bad character '" + c + "' found. ASCII85 only allows characters '!' to 'u'.");
+           END
 
-            ELSE
-                SELF.ErrorMsg='Bad character "' & CHOOSE(cb>=33 AND cb<=126,CHR(cb),'('& cb & ')') &'" found at position ' & SX & |
-                              '. ASCII85 only allows characters ! to u (33-117).'
-                RETURN False  !throw new Exception("Bad character '" + c + "' found. ASCII85 only allows characters '!' to 'u'.");
+        OF 8 TO 13 OROF 32 OROF 0
+           !White space C# was \n \r \t \0 \f \b - odd backspace, no 32=space
+
+        ELSE
+            SELF.ErrorMsg='Bad character "' & CHOOSE(cb>=33 AND cb<=126,CHR(cb),'('& cb & ')') &'" found at position ' & SX & |
+                          '. ASCII85 only allows characters ! to u (33-117).'
+            RETURN False  !throw new Exception("Bad character '" + c + "' found. ASCII85 only allows characters '!' to 'u'.");
 
         END !CASE cb
     END     !LOOP SX
 
     !-- if we have some bytes left over at the end --
-    if count <> 0 then
-        if count = 1 then 
-            SELF.ErrorMsg='The last block of ASCII85 data cannot be a single byte.'
-            RETURN False
-        end !if (count = 1)
-        SELF._tuple += pow85[count]
-        SELF.DecodeBlock(count-1)
-    end !if (count <> 0)    
-    RETURN True 
+    IF count >= 2 THEN
+       SELF._tuple += pow85[count]
+       SELF.DecodeBlock(count-1)
+    ELSIF count = 1 THEN
+       SELF.ErrorMsg='The last block of ASCII85 data cannot be a single byte.'
+       RETURN False
+    END
+    RETURN True
 
 MarksErrorRtn ROUTINE
      SELF.ErrorMsg='ASCII85 encoded data should begin with "' & |
