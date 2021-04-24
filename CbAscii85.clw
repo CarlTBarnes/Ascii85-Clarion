@@ -72,8 +72,9 @@ SX   LONG,AUTO
 Len_Prfx  BYTE,AUTO
 Len_Sufx  BYTE,AUTO
 count LONG,AUTO    
-cb BYTE,AUTO
-UL ULONG,AUTO
+cb LONG,AUTO !04/24 faster than BYTE
+!UL ULONG,AUTO       !04/24 new calc method
+TupLong LONG,AUTO    !04/24 new calc method
 Zeros LONG 
     CODE   
     CLEAR(SELF.ErrorMsg) 
@@ -117,7 +118,7 @@ Zeros LONG
     SELF.DecodedStr &= NEW(STRING(SELF.DecodedSize))
     SELF.DecodedLen = 0
 
-    SELF._tuple=0 ; count=0
+    TupLong=0 ; count=0 ; SELF._tuple=0 
     CLEAR(SELF._decodedBlock[])
     LOOP SX=S1 TO S2      !foreach (char c in s)
         cb=val(S85[Sx])
@@ -125,12 +126,15 @@ Zeros LONG
         OF 33 to 117  !of '!' to 'u'     !04/21/21 refactor this code block up here
            count += 1
            if count < 5 then
-              UL = (cb - 33) * pow85[count]   !Calc as ULONG to avoid negative
-              SELF._tuple += UL               !Sum as ULONG
+!04/24              UL = (cb - 33) * pow85[count]   !Calc as ULONG to avoid negative
+!04/24              SELF._tuple += UL               !Sum as ULONG
+              TupLong = TupLong * 85 + cb - 33      !04/24 new calc method
            else ! count=5
-              SELF._tuple += (cb - 33)        !04/24/21 =5 save * 1 and UL=
+!04/24              SELF._tuple += (cb - 33)        !04/24/21 =5 save * 1 and UL=
+              SELF._tuple = TupLong * 85 + cb - 33  !04/24 new calc method
               SELF.DecodeBlock(4)
               count=0
+              TupLong=0
            end
 
         OF 122 !of 'z'
@@ -165,7 +169,8 @@ Zeros LONG
 
     !-- if we have some bytes left over at the end --
     IF count >= 2 THEN
-       SELF._tuple += pow85[count]
+!04/24       SELF._tuple += pow85[count] 
+       SELF._tuple = TupLong * (85^(5-count)) + pow85[count]  !04/24
        SELF.DecodeBlock(count-1)
     ELSIF count = 1 THEN
        SELF.ErrorMsg='The last block of ASCII85 data cannot be a single byte.'
@@ -189,7 +194,7 @@ i BYTE,AUTO
          SELF.DecodedLen += 1
          SELF.DecodedStr[ SELF.DecodedLen ] = CHR(SELF._decodedBlock[i] )
     END
-    SELF._tuple=0
+!04/24    SELF._tuple=0  4/24 no longer used for accume
     RETURN    
 
 !===========================================================================
