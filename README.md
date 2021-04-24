@@ -3,7 +3,7 @@
 ASCII 85 is binary-to-text encoding similar to Base 64 but is more efficient using 5 bytes to encode 4.
  Read more about in the [Wikipedia ASCII 85 article](https://en.wikipedia.org/wiki/Ascii85).
 
-For discussion of this class see the post on [Clarion Hub post "Converting ASCII85 to Binary"](https://clarionhub.com/t/converting-ascii85-to-binary/4047?u=carlbarnes).
+For discussion of this class see the [Clarion Hub post "Converting ASCII85 to Binary"](https://clarionhub.com/t/converting-ascii85-to-binary/4047?u=carlbarnes).
 
 Jeff Atwood of Coding Horror published a C# ASCII 85 class on Github that I converted to Clarion.
  I tried to make as few changes as possile to the code ... at first
