@@ -15,7 +15,7 @@
     INCLUDE('BigBangTheory.INC'),ONCE   !From  https://github.com/CarlTBarnes/StringTheory-Tools
     MAP
 Ascii85Encode        PROCEDURE  (StringTheory pSt,Long pWrapLen=75,Bool pAdobe=1)
-Ascii85Decode        PROCEDURE  (StringTheory pSt)
+Ascii85Decode        PROCEDURE  (StringTheory pSt),LONG !0=Worked, else Bad Byte
 TestCode    PROCEDURE()
 DB          PROCEDURE(STRING DebugMessage)   !Output Debug String
 DBClear     PROCEDURE()                      !Clear DebugView Buffer  
@@ -48,6 +48,7 @@ PassFail BYTE  !1=Pass 2=Fail
 IconPass EQUATE(Icon:Tick)   
 IconFail EQUATE(Icon:Cross)
 Split75  BYTE(1)
+Failed   LONG    !Ascii85Decode() returns fail point
     CODE
     TestCode()
     RETURN
@@ -112,7 +113,8 @@ Lne  StringTheory
     CODE
     ST.SetValue(LeviEncoded)
     Bang.ValueView(ST,'Value to Decode')
-    Ascii85Decode(St)
+    Failed = Ascii85Decode(St) 
+        IF Failed THEN Message('Decode Failed @ ' & Failed ).
     Bang.ValueView(ST,'Decoded')
     Message('Leviathan Decoded Matches = ' & CHOOSE(St.GetValue()=Leviathan,'YES',' NO') )
     
@@ -124,7 +126,8 @@ Lne  StringTheory
     CODE
     ST.SetValue(WhiteSpace)
     Bang.ValueView(ST,'Value to Decode')
-    Ascii85Decode(St)
+    Failed = Ascii85Decode(St)
+       IF Failed THEN Message('Decode Failed @ ' & Failed ).
     Bang.ValueView(ST,'Decoded')
     Message('Leviathan WhiteSpace Decoded Matches = ' & CHOOSE(St.GetValue()=Leviathan,'YES',' NO') )
     
@@ -143,7 +146,8 @@ A USHORT
        IF A > 250 THEN Bang.ValueView(STencode,'256 Encode Test #' & A) .
 
        STdecode.SetValue(STencode) 
-       Ascii85Decode(STdecode)    
+       Failed =  Ascii85Decode(STdecode) 
+          IF Failed THEN Message('Test #' & A &' Decode Failed @ ' & Failed ).
        
        IF STdecode.GetValue() <> All256 THEN  
            setclipboard('"' & STdecode.GetValue() &'"<13,10>"' & All256 &'"' )
@@ -175,7 +179,8 @@ Ln     LONG
        END 
 
        STdecode.SetValue(STencode) 
-       Ascii85Decode(STdecode)    
+       Failed =  Ascii85Decode(STdecode)
+          IF Failed THEN Message('Test Ln#' & Ln &' Decode Failed @ ' & Failed ).
        
        IF STdecode.GetValue() <> LeviDOTs[1 : Ln] THEN  
            setclipboard('"' & STdecode.GetValue() &'"<13,10>"' &LeviDOTs[1 : Ln] &'"' )
@@ -222,7 +227,8 @@ bAdobe  BYTE(1)
        Bang.ValueView(STencode,'Zero Encode Test #' & A) 
 
        STdecode.SetValue(STencode) 
-       Ascii85Decode(STdecode)    
+       Failed = Ascii85Decode(STdecode)
+          IF Failed THEN Message('Test #' & A &' Decode Failed @ ' & Failed ).
        
        IF STdecode.GetValue() <> All256 THEN  
            setclipboard('"' & STdecode.GetValue() &'"<13,10>"' & All256 &'"' )
@@ -260,7 +266,8 @@ Time2 LONG
    STdecode.SetValue(STencode) 
 
     Time1=CLOCK()
-    Ascii85Decode(STdecode)
+    Failed = Ascii85Decode(STdecode)
+       IF Failed THEN Message('Decode Failed @ ' & Failed ).
     Time2=CLOCK()
 
     Message((Time2-Time1)/100 & ' seconds to Decode {50}' & |
@@ -282,32 +289,32 @@ DbgClear CSTRING('DBGVIEWCLEAR')    !Message to Clear the buffer. Must UPPER and
     CODE 
     OutputDebugString(DbgClear)     !Call API directly, cannot have Prefix, must be first            
 
+!========================================================== 
+! Goeff's code posted 24-June-2021
+! https://clarionhub.com/t/converting-ascii85-to-binary/4047/12?u=carlbarnes
 !==========================================================
 Ascii85Encode        PROCEDURE  (StringTheory pSt,Long pWrapLen=75,Bool pAdobe=1)
 st       StringTheory
 myLong   long,auto
 myULong  ulong,over(myLong)
-!myStr    String(4),over(myLong)   !CArl change to IF =20202020h
 myGrp    group,pre(),over(myLong)
 myStr1     string(1)
 myStr2     string(1)
 myStr3     string(1)
 myStr4     string(1)
          end ! group
-tempStr  String(4),auto        
 x        long,auto
 y        long,auto
 padChars long,auto
 outLen   long,auto
 outstr   String(5),auto
-outGrp   group,pre(),over(outStr)
+         group,pre(),over(outStr)
 out1       byte
 out2       byte
 out3       byte
 out4       byte
 out5       byte
          end ! group
-
   CODE
   if ~pSt._DataEnd then return.
   if pWrapLen < 0  then pWrapLen = 0.
@@ -328,12 +335,11 @@ out5       byte
     myStr2 = pSt.valueptr[x+2]
     myStr3 = pSt.valueptr[x+1]
     myStr4 = pSt.valueptr[x]
-    if ~myLong then st.append('z'); cycle.  ! short form for 0 (low-values)
-!Geoff    if ~pAdobe and ~myStr then st.append('y'); cycle. ! short form for spaces - not supported by Adobe
-    if ~pAdobe and myLong=20202020h then st.append('y'); cycle. !Carl faster Long compare
-    out5 = myULong%85 + 33          ! use Ulong first time in case top bit is on
+    if ~myLong then st.append('z'); cycle.            ! short form for 0 (low-values)
+    if ~pAdobe and myLong=20202020h then st.append('y'); cycle. ! short form for spaces - not supported by Adobe
+    out5 = myULong%85 + 33   ! use Ulong first time in case top bit is on
     myUlong /= 85
-    ! unrolled the loop - we use long here as faster
+    ! unrolled the loop - we use long from here as faster than ulong
     out4 = myLong%85 + 33
     mylong /= 85
     out3 = myLong%85 + 33
@@ -354,29 +360,29 @@ out5       byte
     end
     st.join('<13,10>')
   end
-!  pSt._StealValue(st)    ! point our passed object to our output
-  pSt.SetValue(st)    !  pSt._StealValue(st)    ! point our passed object to our output
-  RETURN 
-!==========================================================
-Ascii85Decode        PROCEDURE  (StringTheory pSt) 
-st       StringTheory
-myLong   long
-myUlong  ulong,over(myLong)
-myStr    String(4),over(myLong)
-myGrp    group,pre(),over(myLong)
-myStr1     string(1)
-myStr2     string(1)
-myStr3     string(1)
-myStr4     string(1)
-         end ! group
-CurValue long,auto   ! value of current character
-swapStr  string(1)
-x        long
-y        long
-padChars long
+  pSt._StealValue(st)    ! point our passed object to our output
+
+Ascii85Decode        PROCEDURE  (StringTheory pSt) !,long 0=Worked >0 Failed 
+st        StringTheory
+myLong    long
+myUlong   ulong,over(myLong)
+myStr     String(4),over(myLong)
+          group,pre(),over(myLong)
+myStr1      string(1)
+myStr2      string(1)
+myStr3      string(1)
+myStr4      string(1)
+          end ! group
+CurValue  long,auto   ! value of current character
+swapStr   string(1)
+x         long
+y         long
+padChars  long
+AdobePrfx long
 
   CODE
   if pSt._DataEnd > 3 and pSt.startsWith('<<~') and pSt.endsWith('~>') 
+    AdobePrfx = 2
     pSt.crop(3, pSt._DataEnd-2)  ! remove Adobe begin/end chars
   end
   st.setLength(pSt._DataEnd); free(st)  ! preallocate some space (optional)
@@ -392,22 +398,24 @@ padChars long
         else
           myUlong = myUlong*85 + curValue - 33
           ! swap endian-ness (reverse byte order)
-!          st.append(myStr4)
-!          st.append(myStr3)
-!          st.append(myStr2)
-!          st.append(myStr1)
-          swapStr = myStr1
-          myStr1  = myStr4
-          myStr4  = swapStr
-          swapStr = myStr2
-          myStr2  = myStr3
-          myStr3  = swapStr
+          swapStr = myStr1; myStr1  = myStr4; myStr4  = swapStr  ! swap chars
+          swapStr = myStr2; myStr2  = myStr3; myStr3  = swapStr  ! swap chars
           st.append(myStr)
           y = 0
           myLong = 0
         end
-      of 122; st.append('<0,0,0,0>')      !z used for zeroes (low-values)
-      of 121; st.append('<32,32,32,32>')  !y used for spaces
+      of 122 
+        if y then return x+AdobePrfx.  ! error - 'z' within group of 5 chars
+        st.append('<0,0,0,0>')         ! z used for zeroes (low-values)
+      of 121
+        if y then return x+AdobePrfx.  ! error - 'y' within group of 5 chars
+        st.append('<32,32,32,32>')     ! y used for spaces
+      of 8 to 13 
+      orof 32
+        ! valid formating character so just ignore it
+      else
+        ! error - dud/unexpected character so return position
+        return x + AdobePrfx
       end !case
     end
     if y ! padding required? 
@@ -418,6 +426,6 @@ padChars long
     end
   end
   if padChars then st.setLength(st._DataEnd - padChars).
-!  pSt._StealValue(st)    ! point our passed object to our output
-  pSt.SetValue(st)    ! pSt._StealValue(st)    ! point our passed object to our output
-  RETURN 
+  pSt._StealValue(st)    ! point our passed object to our output
+  return 0               ! all is well in the world (valid input decoded without error)
+  
