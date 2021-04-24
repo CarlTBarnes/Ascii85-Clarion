@@ -13,10 +13,44 @@ Jeff Atwood of Coding Horror published a C# ASCII 85 class on Github that I conv
  Is that cleaner code? I'd say yes, as long as the IF logic is just as understandable.
  
 https://github.com/coding-horror/ascii85
+
+The included Ascii85.clw project tests the class several ways and shows examples of usage.
+ The FileTo85 example shows using System String Class to read a file and encode, write it, decode and write that.
  
+The St_85test example includes Geoff Robinson's String Theory ASCII 85 class and code to test it.
+
 The orignal class returned a string. In my class .DecodeString() and .EncodeString() methods return True/False.
  The actual STRING is in .DecodedStr or .EncodedStr.
   If the functions return False these strings will be NULL and crash if you try to use them.
+
+```clarion
+CbAscii85Class    CLASS,TYPE
+LineLength   USHORT      !Default 75    Maximum line length for encoded ASCII85 string before CR,LF;
+                         !                set to zero for one unbroken line (no CR,LF).
+EnforceMarks BOOL        !Default TRUE  Add the Prefix and Suffix marks when encoding, and enforce their presence for decoding
+PrefixMark   PSTRING(8)  !Default "<~"  Prefix mark that identifies an encoded ASCII85 string, traditionally '<~'
+SuffixMark   PSTRING(8)  !Default "~>"  Suffix mark that identifies an encoded ASCII85 string, traditionally '~>'
+Y_4_Spaces   BOOL        !Default False Like 'z' for Spaces, not Adobe compat, BtoA v4.2
+ErrorMsg     STRING(128) !Error message set when DecodeString() return False/Failed
+
+Init         PROCEDURE(<USHORT LineLength>,<BOOL EnforceMarks>,<STRING PrefixMark>,<STRING SuffixMark>) 
+Kill         PROCEDURE(BOOL KillDecode=1, BOOL KillEncode=1)
+!---------------------------------------------------------- 
+DecodeString    PROCEDURE(STRING EncodedString),BOOL  !returns True if worked
+DecodeString    PROCEDURE(*STRING EncodedString),BOOL !returns True if worked
+                !If DecodeString() returns False then see .ErrorMsg
+                !If DecodeString() returns True  then .DecodedStr is STRING of .DecodedLen Bytes
+DecodedStr          &STRING !Output of DecodeString
+DecodedLen          LONG    !Length of DecodedStr w/o padding
+DecodedSize         LONG    !String Size may be litte bigger than needed 
+!----------------------------------------------------------
+EncodeString    PROCEDURE(STRING Data2Encode,  LONG EncodeLength=0),BOOL
+EncodeString    PROCEDURE(*STRING Data2Encode, LONG EncodeLength=0),BOOL
+                !If EncodeString() returns True  then .EncodedStr is STRING of .EncodedLen Bytes
+EncodedStr          &STRING !Output of EncodeString
+EncodedLen          LONG    !Length of EncodedStr w/o padding
+EncodedSize         LONG    !String Size may be litte bigger than needed   
+```
   
 This has been tested with these standards:
 
@@ -49,8 +83,3 @@ LeviEncoded STRING('<<~9jqo^BlbD-BleB1DJ+*+F(f,q/0JhKF<<GL>Cj@.4Gp$d7F!,L7@<<6@)
   
 
 ```
-
-The included Ascii85.clw project tests the class several ways and shows examples of usage.
- The FileTo85 example shows using System String Class to read a file and encode, write it, decode and write that.
- 
-The St_85test example includes Geoff Robinson's String Theory ASCII 85 class and code to test it.
