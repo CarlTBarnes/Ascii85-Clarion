@@ -31,7 +31,8 @@ PassFail BYTE  !1=Pass 2=Fail
 IconPass EQUATE(Icon:Tick)   
 IconFail EQUATE(Icon:Cross)   
   CODE
-  SYSTEM{PROP:MsgModeDefault}=MSGMODE:CANCOPY  
+  SYSTEM{PROP:MsgModeDefault}=MSGMODE:CANCOPY
+  !DO UlongTestRtn   !ULong calc checks
   !DO FileTestRtn ; return 
   !GOTO Zero0000Label:
   !GOTO LengthTestsLabel:
@@ -301,12 +302,12 @@ File85  CbAscii85Class
                Message('File Encode Failed ' & File85.ErrorMsg,'File Test' & YCaption,IconFail )
                EXIT 
            END     
-        Message((Time2-Time1)/100 & ' seconds to encode' & YCaption & ' {50}' & |
+        IF Message((Time2-Time1)/100 & ' seconds to encode' & YCaption & ' {50}' & |
                 '||File loaded Bytes<9>=' & SSC.Length() & |
                 '||Encoded Length<9>=' & File85.EncodedLen & |
                 '   Size=' & File85.EncodedSize & |
                 '||Extra=' & File85.EncodedSize-File85.EncodedLen , |
-                'Encode ClaRun.DLL' & YCaption,,'Decode 1 Second') 
+                'Encode ClaRun.DLL' & YCaption,,'Decode 1 Second|Halt') =2 THEN HALT.
 
         Time1=CLOCK()
         Result = File85.DecodeString(File85.EncodedStr) 
@@ -324,17 +325,27 @@ File85  CbAscii85Class
                        ,'Decode ClaRun.DLL' & YCaption,IconFail )
 
            ELSE 
-               Message((Time2-Time1)/100 & ' seconds to decode' & YCaption & ' {50}' & |
+               IF Message((Time2-Time1)/100 & ' seconds to decode' & YCaption & ' {50}' & |
                        '||File DecodeString PASSED' & |
                        '||Input File Length<9>='  & SSC.Length() &|
                        '|Decoded length<9>=' & File85.DecodedLen, |
                        'Decode ClaRun.DLL' & YCaption,IconPass , |
-                       CHOOSE(YTest=0,'Encode Y 4 Spaces','Close') )
+                       CHOOSE(YTest=0,'Encode Y 4 Spaces|Halt','Close|Halt') ) =2 THEN HALT.
                
            END 
        END    !Loop YTest
     EXIT     
 
+!---------------------------------------------
+UlongTestRtn ROUTINE !Confirms ULong on Left-side = Longs on Right-side
+    DATA
+L LONG
+U ULONG
+    CODE
+    L=2000000000
+    U=L*2 + 13    !Overflows Long to go Negative, Confirms works
+    Message(' {50}|Long<9>=' & L & '|L*2+13<9>=' & L*2+13 &'||ULong<9>=' & U) 
+    EXIT
 !---------------------------------------------    
 
 ReadMeCodeRtn ROUTINE

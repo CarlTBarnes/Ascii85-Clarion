@@ -235,14 +235,16 @@ b  BYTE,AUTO
     LOOP bx=1 TO Len_Data !foreach (byte b in ba)
         b = VAL(ba[bx]) 
         if count >= 4-1 then ! >= _decodedBlock.Length - 1) Every 4th byte zero based
-            SELF._tupByte[1] = b  !SELF._tuple = BOR(SELF._tuple,b)     ! _tuple |= b;
-            if SELF._tuple = 0 then 
-               SELF.AppendChar(122) !('z')
-            elsif SELF.Y_4_Spaces and SELF._tuple = 20202020h then 
-               SELF.AppendChar(121) !('y')
+            SELF._tupByte[1] = b        ! _tuple |= b;
+            if ~SELF._tuple then
+               SELF.AppendChar(122)     !('z') encode 4 x 00h
+            elsif ~SELF.Y_4_Spaces then
+               SELF.EncodeBlock(5)      !n/a 'y' encode text w/o checking for spaces
+            elsif SELF._tuple=20202020h then
+               SELF.AppendChar(121)     !('y') encode 4 x spaces
             else
-               SELF.EncodeBlock(5)
-            end 
+               SELF.EncodeBlock(5)      !('y') allowed encode text
+            end
             SELF._tuple = 0
             count = 0           
         else 
