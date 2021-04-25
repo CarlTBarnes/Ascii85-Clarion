@@ -61,7 +61,6 @@ _decodedBlock   BYTE,DIM(4),PROTECTED
 _tuple          ULONG,PROTECTED         !private uint _tuple = 0;
 _tupLong        LONG,OVER(_tuple),PROTECTED         !faster
 _tupByte        BYTE,DIM(4),OVER(_tuple),PROTECTED  !be faster like Geoff
-_encodedBlock   BYTE,DIM(5),PROTECTED   !private byte[] _encodedBlock = new byte[5];
 _linePos        LONG,PROTECTED          !private int _linePos = 0;
 
 !Methods Internal
@@ -69,7 +68,7 @@ _linePos        LONG,PROTECTED          !private int _linePos = 0;
 Construct               PROCEDURE()
 Destruct                PROCEDURE(),VIRTUAL
 DecodeBlock             PROCEDURE(BYTE bytes),PROTECTED
-EncodeBlock             PROCEDURE(BYTE count),PROTECTED 
+EncodeBlock             PROCEDURE(LONG count),PROTECTED 
 AppendString            PROCEDURE(string String2Append),PROTECTED 
 AppendChar              PROCEDURE(BYTE OneChar2Append),PROTECTED 
                     END

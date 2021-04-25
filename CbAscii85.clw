@@ -261,24 +261,24 @@ BX LONG,AUTO
     RETURN true 
   
 !-----------------------------------------    
-CbAscii85Class.EncodeBlock PROCEDURE(BYTE count)
-i LONG,AUTO  
+CbAscii85Class.EncodeBlock PROCEDURE(LONG count)
+i LONG,AUTO
+Encode5 BYTE,DIM(5),AUTO
     CODE
 !    LOOP i = 5 TO 1 BY -1       ! for (int i = _encodedBlock.Length - 1; i >= 0; i--)
 !        SELF._encodedBlock[i] = (SELF._tuple % 85) + _asciiOffset
 !        SELF._tuple /= 85
 !    END    
 !---
-    SELF._encodedBlock[5] = SELF._tuple   % 85 + 33 ; SELF._tuple /= 85
-    SELF._encodedBlock[4] = SELF._tupLong % 85 + 33 ; SELF._tupLong /= 85
-    SELF._encodedBlock[3] = SELF._tupLong % 85 + 33 ; SELF._tupLong /= 85
-    SELF._encodedBlock[2] = SELF._tupLong % 85 + 33 ; SELF._tupLong /= 85
-    SELF._encodedBlock[1] = SELF._tupLong % 85 + 33 ! no need  SELF._tupLong /= 85
-
-    LOOP i=1 TO count           ! for (int i = 0; i < count; i++)
-        SELF.AppendChar(SELF._encodedBlock[i])   
-    END 
-    RETURN 
+    Encode5[5] = SELF._tuple   % 85 + 33 ; SELF._tuple /= 85
+    Encode5[4] = SELF._tupLong % 85 + 33 ; SELF._tupLong /= 85
+    Encode5[3] = SELF._tupLong % 85 + 33 ; SELF._tupLong /= 85
+    Encode5[2] = SELF._tupLong % 85 + 33 ; SELF._tupLong /= 85
+    Encode5[1] = SELF._tupLong % 85 + 33 ! no need  SELF._tupLong /= 85
+    LOOP i=1 TO count
+        SELF.AppendChar(Encode5[i])
+    END
+    RETURN
 !-------------------------------------------------
 CbAscii85Class.AppendString PROCEDURE(string s) 
     CODE
