@@ -206,9 +206,8 @@ CbAscii85Class.EncodeString  PROCEDURE(*STRING ba, LONG Len_Data=0)!,BOOL
 !-----------------------------------
 Len_Prfx  BYTE,AUTO
 Len_Sufx  BYTE,AUTO
-count LONG
-BX LONG,AUTO
-b  BYTE,AUTO 
+countDown LONG,AUTO
+BX LONG,AUTO 
     CODE 
     CLEAR(SELF.ErrorMsg) 
     SELF.Kill(0,1)
@@ -227,37 +226,33 @@ b  BYTE,AUTO
     SELF.EncodedLen = 0
     SELF._linePos = 0
     SELF._tuple = 0
+    countDown=4
 
     IF SELF.EnforceMarks AND Len_Prfx THEN
        SELF.AppendString(SELF.PrefixMark) 
     END
 
     LOOP bx=1 TO Len_Data !foreach (byte b in ba)
-        b = VAL(ba[bx]) 
-        if count >= 4-1 then ! >= _decodedBlock.Length - 1) Every 4th byte zero based
-            SELF._tupByte[1] = b        ! _tuple |= b;
-            if ~SELF._tuple then
-               SELF.AppendChar(122)     !('z') encode 4 x 00h
-            elsif ~SELF.Y_4_Spaces then
-               SELF.EncodeBlock(5)      !n/a 'y' encode text w/o checking for spaces
-            elsif SELF._tuple=20202020h then
-               SELF.AppendChar(121)     !('y') encode 4 x spaces
-            else
-               SELF.EncodeBlock(5)      !('y') allowed encode text
-            end
-            SELF._tuple = 0
-            count = 0           
-        else 
-          !    _tuple   |= (uint) (b << (24 - (count * 8)));
-          ! SELF._tuple = BOR(SELF._tuple, BSHIFT(b , (24 - (count * 8))) ) 
-            SELF._tupByte[4-count] = b
-            count += 1
+        SELF._tupByte[countDown] = VAL(ba[bx])
+        if countDown = 1 then
+           if ~SELF._tuple then
+              SELF.AppendChar(122)     !('z') encode 4 x 00h
+           elsif ~SELF.Y_4_Spaces then
+              SELF.EncodeBlock(5)      !n/a 'y' encode text w/o checking for spaces
+           elsif SELF._tuple=20202020h then
+              SELF.AppendChar(121)     !('y') encode 4 x spaces
+           else
+              SELF.EncodeBlock(5)      !('y') allowed encode text
+           end
+           SELF._tuple = 0
+           countDown=4
+        else
+           countDown -= 1
         end 
     END !Loop bx 
-
     !-- if we have some bytes left over at the end --
-    if count > 0 then
-        SELF.EncodeBlock(count + 1)
+    if countDown < 4 then  
+        SELF.EncodeBlock(5-countDown) !(count + 1)
     end 
 
     IF SELF.EnforceMarks AND Len_Sufx THEN
@@ -304,6 +299,7 @@ CbAscii85Class.AppendString PROCEDURE(string s)
 !-------------------------------------------------
 CbAscii85Class.AppendChar PROCEDURE(BYTE Chr1)
     CODE 
+!?    ASSERT(SELF.EncodedLen+3 <= SELF.EncodedSize,'Append Length='& SELF.EncodedLen &' Size='& SELF.EncodedSize)
     IF SELF._linePos >= SELF.LineLength AND SELF.LineLength THEN 
        SELF._linePos = 0
        SELF.EncodedLen += 1 ; SELF.EncodedStr[SELF.EncodedLen] = '<13>'
