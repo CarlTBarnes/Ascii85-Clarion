@@ -290,14 +290,14 @@ DbgClear CSTRING('DBGVIEWCLEAR')    !Message to Clear the buffer. Must UPPER and
     OutputDebugString(DbgClear)     !Call API directly, cannot have Prefix, must be first            
 
 !========================================================== 
-! Goeff's code posted 24-June-2021
+! Goeff's code posted 25-June-2021
 ! https://clarionhub.com/t/converting-ascii85-to-binary/4047/12?u=carlbarnes
 !==========================================================
 Ascii85Encode        PROCEDURE  (StringTheory pSt,Long pWrapLen=75,Bool pAdobe=1)
 st       StringTheory
 myLong   long,auto
 myULong  ulong,over(myLong)
-myGrp    group,pre(),over(myLong)
+         group,pre(),over(myLong)
 myStr1     string(1)
 myStr2     string(1)
 myStr3     string(1)
@@ -315,6 +315,7 @@ out3       byte
 out4       byte
 out5       byte
          end ! group
+
   CODE
   if ~pSt._DataEnd then return.
   if pWrapLen < 0  then pWrapLen = 0.
@@ -362,70 +363,78 @@ out5       byte
   end
   pSt._StealValue(st)    ! point our passed object to our output
 
-Ascii85Decode        PROCEDURE  (StringTheory pSt) !,long 0=Worked >0 Failed 
+
+Ascii85Decode        PROCEDURE  (StringTheory pSt) !,long  ! Declare Procedure
 st        StringTheory
-myLong    long
-myUlong   ulong,over(myLong)
-myStr     String(4),over(myLong)
-          group,pre(),over(myLong)
+myGroup   group,pre()
 myStr1      string(1)
 myStr2      string(1)
 myStr3      string(1)
 myStr4      string(1)
+myStr5      string(1)
+myStr6      string(1)
+myStr7      string(1)
           end ! group
+myLong    long, over(myGroup)
+myUlong   ulong,over(myGroup)
 CurValue  long,auto   ! value of current character
-swapStr   string(1)
-x         long
+x         long,auto
 y         long
-padChars  long
 AdobePrfx long
 
   CODE
-  if pSt._DataEnd > 3 and pSt.startsWith('<<~') and pSt.endsWith('~>') 
+  if pSt._DataEnd > 3 and pSt.valuePtr[1 : 2] = '<<~' and pSt.valuePtr[pSt._dataEnd-1 : pSt._dataEnd] = '~>' 
     AdobePrfx = 2
-    pSt.crop(3, pSt._DataEnd-2)  ! remove Adobe begin/end chars
+    pSt.setLength(pSt._dataEnd - 2)
+    x = 3
+  else
+    x = 1
   end
   st.setLength(pSt._DataEnd); free(st)  ! preallocate some space (optional)
-  x = 1
-  loop !5 times
-    loop x = x to pSt._DataEnd
-      curValue = val(pSt.valueptr[x])
-      case curValue
-      of 33 to 117
-        y += 1
-        if y < 5
-          myLong = myLong*85 + curValue - 33
-        else
-          myUlong = myUlong*85 + curValue - 33
-          ! swap endian-ness (reverse byte order)
-          swapStr = myStr1; myStr1  = myStr4; myStr4  = swapStr  ! swap chars
-          swapStr = myStr2; myStr2  = myStr3; myStr3  = swapStr  ! swap chars
-          st.append(myStr)
-          y = 0
-          myLong = 0
-        end
-      of 122 
-        if y then return x+AdobePrfx.  ! error - 'z' within group of 5 chars
-        st.append('<0,0,0,0>')         ! z used for zeroes (low-values)
-      of 121
-        if y then return x+AdobePrfx.  ! error - 'y' within group of 5 chars
-        st.append('<32,32,32,32>')     ! y used for spaces
-      of 8 to 13 
-      orof 32
-        ! valid formating character so just ignore it
+  myLong = 0
+  loop x = x to pSt._DataEnd
+    curValue = val(pSt.valueptr[x])
+    case curValue
+    of 33 to 117
+      y += 1
+      if y < 5
+        myLong = myLong*85 + curValue - 33
       else
-        ! error - dud/unexpected character so return position
-        return x + AdobePrfx
-      end !case
-    end
-    if y ! padding required? 
-      padChars += 1
-      pSt.append('u')   ! pad with u char
+        myUlong = myUlong*85 + curValue - 33
+        myStr5 = myStr3;  myStr6 = myStr2; myStr7 = myStr1 ! swap endian-ness (reverse byte order)
+        st.CatAddr(address(myStr4),4)
+        y = 0
+        myLong = 0
+      end
+    of 122 
+      if y then return x+AdobePrfx.  ! error - 'z' within group of 5 chars
+      st.append('<0,0,0,0>')         ! z used for zeroes (low-values)
+    of 121
+      if y then return x+AdobePrfx.  ! error - 'y' within group of 5 chars
+      st.append('<32,32,32,32>')     ! y used for spaces
+    of 8 to 13 
+    orof 32
+      ! valid formating character so just ignore it
     else
-      break
+      ! error - dud/unexpected character so return position
+      return x + AdobePrfx
+    end !case
+  end
+  if y > 1 ! padding required?
+    loop 4-y times    
+      myLong = myLong*85 + 84  ! 84 = val('u') - 33 = 117 - 33
+    end
+    myUlong = myUlong*85 + 84
+    case y
+    of 2
+      st.append(myStr4)
+    of 3  ! myStr4 & myStr3
+      myStr5 = myStr3
+      st.CatAddr(address(myStr4),2)
+    of 4  ! myStr4 & myStr3 & myStr2
+      myStr5 = myStr3;  myStr6 = myStr2
+      st.CatAddr(address(myStr4),3)
     end
   end
-  if padChars then st.setLength(st._DataEnd - padChars).
   pSt._StealValue(st)    ! point our passed object to our output
-  return 0               ! all is well in the world (valid input decoded without error)
-  
+  return 0               ! all is well in the world (valid input decoded without error)  
