@@ -170,7 +170,7 @@ Zeros LONG
     !-- if we have some bytes left over at the end --
     IF count >= 2 THEN
 !04/24       SELF._tuple += pow85[count] 
-       SELF._tuple = TupLong * (85^(5-count)) + pow85[count]  !04/24
+       SELF._tuple = TupLong * pow85[count] + pow85[count]  !04/25
        SELF.DecodeBlock(count-1)
     ELSIF count = 1 THEN
        SELF.ErrorMsg='The last block of ASCII85 data cannot be a single byte.'
