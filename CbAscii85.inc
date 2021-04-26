@@ -61,7 +61,9 @@ _decodedBlock   BYTE,DIM(4),PROTECTED
 _tuple          ULONG,PROTECTED         !private uint _tuple = 0;
 _tupLong        LONG,OVER(_tuple),PROTECTED         !faster
 _tupByte        BYTE,DIM(4),OVER(_tuple),PROTECTED  !be faster like Geoff
-_linePos        LONG,PROTECTED          !private int _linePos = 0;
+_linePos        LONG,PROTECTED
+_LenPrefix      BYTE,OVER(PrefixMark)   !FYI: Byte is Over PString[0] is the LEN()
+_LenSuffix      BYTE,OVER(SuffixMark)   !FYI: Byte is Over PString[0] is the LEN()
 
 !Methods Internal
 !----------------

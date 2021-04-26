@@ -38,8 +38,8 @@ CbAscii85Class.Init PROCEDURE(<USHORT LineLength>,<BOOL EnforceMarks>,<STRING Pr
     CODE
     IF ~OMITTED(LineLength)   THEN SELF.LineLength=LineLength.
     IF ~OMITTED(EnforceMarks) THEN SELF.EnforceMarks=EnforceMarks.
-    IF ~OMITTED(PrefixMark)   THEN SELF.PrefixMark=PrefixMark.
-    IF ~OMITTED(SuffixMark)   THEN SELF.SuffixMark=SuffixMark.
+    IF ~OMITTED(PrefixMark)   THEN SELF.PrefixMark=CLIP(PrefixMark). !FYI: PString=String
+    IF ~OMITTED(SuffixMark)   THEN SELF.SuffixMark=CLIP(SuffixMark). !ditto
     RETURN
 
 !-----------------------------------
@@ -69,11 +69,8 @@ Len_s85   LONG,AUTO
 S1   LONG,AUTO
 S2   LONG,AUTO
 SX   LONG,AUTO
-Len_Prfx  BYTE,AUTO
-Len_Sufx  BYTE,AUTO
 count LONG,AUTO    
 cb LONG,AUTO !04/24 faster than BYTE
-!UL ULONG,AUTO       !04/24 new calc method
 TupLong LONG,AUTO    !04/24 new calc method
 Zeros LONG 
     CODE   
@@ -82,33 +79,30 @@ Zeros LONG
     Len_s85=LEN(CLIP(s85)) 
     LOOP While Len_s85   !Strip White space off the end so can find ~>
         CASE VAL(s85[Len_s85])
-        OF 8 TO 13 OROF 32 OROF 0 
+        OF 9 TO 13 OROF 32 OROF 0 
            Len_s85 -= 1
         ELSE 
             BREAK
         END
     END
     S1=1 ; S2=Len_s85
-    Len_Prfx=LEN(SELF.PrefixMark)
-    Len_Sufx=LEN(SELF.SuffixMark)
     !-- strip prefix <~ and suffix ~> if present --
-    IF Len_Prfx AND Len_s85 >= Len_Prfx |
-    AND s85[1 : Len_Prfx]=SELF.PrefixMark THEN  !if (s.StartsWith(PrefixMark))
-        S1 += Len_Prfx                          ! s = s.Substring(PrefixMark.Length);
-    ELSIF SELF.EnforceMarks THEN 
+    IF  SELF._LenPrefix AND Len_s85 >= SELF._LenPrefix |
+    AND SELF.PrefixMark = s85[1 : SELF._LenPrefix]     THEN
+        S1 += SELF._LenPrefix      !Start loop after <~ prefix
+    ELSIF SELF.EnforceMarks THEN
         DO MarksErrorRtn
     END
-    IF Len_Sufx AND Len_s85 >= Len_Prfx+Len_Sufx |
-    AND s85[Len_s85 - Len_Sufx+1 : Len_s85]=SELF.SuffixMark THEN     
-        S2 -= Len_Sufx                          !s = s.Substring(0, s.Length - SuffixMark.Length);
-    ELSIF SELF.EnforceMarks THEN 
+    IF  SELF._LenSuffix AND Len_s85 >= SELF._LenPrefix+SELF._LenSuffix |
+    AND SELF.SuffixMark = s85[Len_s85 - SELF._LenSuffix+1 : Len_s85]   THEN
+        S2 -= SELF._LenSuffix      !End loop before ~> suffix
+    ELSIF SELF.EnforceMarks THEN
         DO MarksErrorRtn
     END
     IF Len_s85 < 1 OR S1 > S2 THEN
        SELF.ErrorMsg=S2-S1+1 & ' bytes to decode'
        RETURN False
-    END 
-    
+    END
     LOOP SX=S1 TO S2   !Single 'z' decodes as <0,0,0,0> so need to zllocate 4 bytes
         CASE VAL(S85[SX]) 
         OF 122 OROF  121 ; Zeros += 1  !'z' 4 x 00h or 'y' is 4 x Spaces
@@ -156,8 +150,8 @@ Zeros LONG
               RETURN False  !throw new Exception("Bad character '" + c + "' found. ASCII85 only allows characters '!' to 'u'.");
            END
 
-        OF 8 TO 13 OROF 32 OROF 0
-           !White space C# was \n \r \t \0 \f \b - odd backspace, no 32=space
+        OF 9 TO 13 OROF 32 OROF 0
+           !White space C# was \n \r \t \0 \f \b - odd /b=8 backspace, no 32=space
 
         ELSE
             SELF.ErrorMsg='Bad character "' & CHOOSE(cb>=33 AND cb<=126,CHR(cb),'('& cb & ')') &'" found at position ' & SX & |
@@ -204,21 +198,17 @@ CbAscii85Class.EncodeString  PROCEDURE(STRING ba, LONG EncodeLength=0)!,BOOL
 !-----------------------------------
 CbAscii85Class.EncodeString  PROCEDURE(*STRING ba, LONG Len_Data=0)!,BOOL
 !-----------------------------------
-Len_Prfx  BYTE,AUTO
-Len_Sufx  BYTE,AUTO
 countDown LONG,AUTO
 BX LONG,AUTO 
     CODE 
     CLEAR(SELF.ErrorMsg) 
     SELF.Kill(0,1)
-    Len_Prfx=LEN(SELF.PrefixMark)
-    Len_Sufx=LEN(SELF.SuffixMark)
     IF Len_Data=0 THEN Len_Data=LEN(CLIP(ba)).
     IF Len_Data < 1 THEN 
        SELF.ErrorMsg=Len_Data & ' bytes to encode'
        RETURN False    
     END
-    SELF.EncodedSize = Len_Data / 4 * 5 + 5 + Len_Prfx + Len_Sufx
+    SELF.EncodedSize = Len_Data / 4 * 5 + 5 + SELF._LenPrefix + SELF._LenSuffix
     IF SELF.LineLength THEN  
        SELF.EncodedSize += 2 * ( 2 + SELF.EncodedSize / SELF.LineLength) 
     END 
@@ -228,7 +218,7 @@ BX LONG,AUTO
     SELF._tuple = 0
     countDown=4
 
-    IF SELF.EnforceMarks AND Len_Prfx THEN
+    IF SELF.EnforceMarks AND SELF._LenPrefix THEN
        SELF.AppendString(SELF.PrefixMark) 
     END
 
@@ -255,7 +245,7 @@ BX LONG,AUTO
         SELF.EncodeBlock(5-countDown) !(count + 1)
     end 
 
-    IF SELF.EnforceMarks AND Len_Sufx THEN
+    IF SELF.EnforceMarks AND SELF._LenSuffix THEN
        SELF.AppendString(SELF.SuffixMark) 
     END 
     RETURN true 
