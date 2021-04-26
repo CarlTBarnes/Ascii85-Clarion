@@ -9,7 +9,10 @@ FileTo85Test PROCEDURE()
   END
 
     CODE
-    SYSTEM{PROP:MsgModeDefault}=MSGMODE:CANCOPY
+    COMPILE('**END 11**', _C110_)
+  SYSTEM{PROP:MsgModeDefault}=MSGMODE:CANCOPY
+    !end of COMPILE('**END 11**', _C11_)
+    
     FileTo85Test()
 
 FileTo85Test PROCEDURE()
@@ -66,7 +69,18 @@ YCaption PSTRING(20)
 EncodeRtn ROUTINE 
     
     Time1=CLOCK()
-    Result = File85.EncodeString(SSread.GetStringRef()) 
+ 
+    OMIT('**END 10**', _C110_)    !04/26 Clarion 10 and prior
+        Result = File85.EncodeString(SSread.GetString()) !Has 42,732 <00,00,00,00> 
+        !C10 did not have GetStringRef(),*STRING
+        !    but you could add your own with RETURN SELF.S
+    !end of COMPILE('**END 10**', _C11_)
+
+    COMPILE('**END 11**', _C110_)    !04/26 Clarion 11+
+        Result = File85.EncodeString(SSread.GetStringRef()) !Has 42,732 <00,00,00,00>
+    !end of COMPILE('**END 11**', _C11_)
+
+    
     Time2=CLOCK()
     IF ~Result THEN 
         Message('File Encode Failed ' & File85.ErrorMsg,'File Test' & YCaption)

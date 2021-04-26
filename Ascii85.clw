@@ -30,10 +30,13 @@ Ln     LONG
 PassFail BYTE  !1=Pass 2=Fail
 IconPass EQUATE(Icon:Tick)   
 IconFail EQUATE(Icon:Cross)   
-  CODE
+  CODE 
+  COMPILE('**END 11**', _C110_)
   SYSTEM{PROP:MsgModeDefault}=MSGMODE:CANCOPY
+    !end of COMPILE('**END 11**', _C11_)
+  !GOTO EncodeLabel:
   !DO UlongTestRtn   !ULong calc checks
-  !DO FileTestRtn ; return 
+  DO FileTestRtn ; return 
   !GOTO Zero0000Label:
   !GOTO LengthTestsLabel:
   !GOTO All256Label:      !Test High Ascii on end and rotate to front
@@ -77,9 +80,12 @@ IconFail EQUATE(Icon:Cross)
   END  
 
   
-  !--- Encode Test ---
+  !--- Encode Test --- 
+EncodeLabel:  
   NoWrap85.LineLength=0   !No 13,10 to Match my LeviEncoded test
-  Result = NoWrap85.EncodeString(Leviathan)
+!  Message('len=' & len(Leviathan) &'  Encoded='& size(LeviEncoded) & |
+!           '||' & Leviathan)
+  Result = NoWrap85.EncodeString(Leviathan) 
   Result = Ascii85.EncodeString(Leviathan)
       
   IF ~Result THEN 
@@ -296,7 +302,17 @@ File85  CbAscii85Class
         File85.Y_4_Spaces = YTest
         YCaption=CHOOSE(YTest=0,'',' - Y 4 Spaces')
         Time1=CLOCK()
+
+    OMIT('**END 10**', _C110_)    !04/26 Clarion 10 and prior
+        Result = File85.EncodeString(SSC.GetString()) !Has 42,732 <00,00,00,00> 
+        !C10 did not have GetStringRef(),*STRING
+        !    but you could add your own with RETURN SELF.S
+    !end of COMPILE('**END 10**', _C11_)
+
+    COMPILE('**END 11**', _C110_)    !04/26 Clarion 11+
         Result = File85.EncodeString(SSC.GetStringRef()) !Has 42,732 <00,00,00,00>
+    !end of COMPILE('**END 11**', _C11_)
+
         Time2=CLOCK()
            IF ~Result THEN 
                Message('File Encode Failed ' & File85.ErrorMsg,'File Test' & YCaption,IconFail )
